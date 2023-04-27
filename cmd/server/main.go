@@ -12,12 +12,18 @@ var metricsStorage = memstorage.NewMemStorage()
 
 func update(res http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
-		metrics, err := urlparser.ParseMetricUrl(req.URL.String())
+		err := memstorage.SaveMetrics(req.URL.String(), &metricsStorage)
 		if err != nil {
-			res.WriteHeader(http.StatusBadRequest)
+			switch err {
+			case urlparser.ErrConverValue:
+				res.WriteHeader(http.StatusBadRequest)
+			case urlparser.ErrMetricType:
+				res.WriteHeader(http.StatusBadRequest)
+			case urlparser.ErrEmptyMetricName:
+				res.WriteHeader(http.StatusNotFound)
+			}
 			return
 		}
-		memstorage.SaveMetrics(metrics, &metricsStorage)
 		res.WriteHeader(http.StatusOK)
 		fmt.Printf("gauge: %v\ncounter: %v\n", metricsStorage.Gauge, metricsStorage.Counter)
 		return

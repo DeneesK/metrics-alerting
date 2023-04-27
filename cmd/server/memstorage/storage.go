@@ -1,8 +1,6 @@
 package memstorage
 
-import (
-	"github.com/DeneesK/metrics-alerting/cmd/server/urlparser"
-)
+import "github.com/DeneesK/metrics-alerting/cmd/server/urlparser"
 
 type MemStorage struct {
 	Gauge   map[string]float32
@@ -13,10 +11,15 @@ func NewMemStorage() MemStorage {
 	return MemStorage{Gauge: make(map[string]float32), Counter: make(map[string]int)}
 }
 
-func SaveMetrics(m urlparser.MetricPayload, storage *MemStorage) {
+func SaveMetrics(u string, storage *MemStorage) error {
+	m, err := urlparser.ParseMetricUrl(u)
+	if err != nil {
+		return err
+	}
 	if m.MetricType == "counter" {
 		storage.Counter[m.MetricName] += m.CounterValue
-		return
+		return nil
 	}
 	storage.Gauge[m.MetricName] = m.CaugeValue
+	return nil
 }
