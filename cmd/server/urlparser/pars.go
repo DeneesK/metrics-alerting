@@ -20,12 +20,12 @@ type MetricPayload struct {
 func ParseMetricURL(u string) (MetricPayload, error) {
 	mp := MetricPayload{}
 	arr := strings.Split(u, "/")[2:]
-	if len(arr) < 3 {
-		return mp, ErrEmptyMetricName
-	}
 	switch arr[0] {
 	case "counter":
 		mp.MetricType = "counter"
+		if len(arr) < 3 {
+			return mp, ErrEmptyMetricName
+		}
 		n, err := strconv.Atoi(arr[2])
 		if err != nil {
 			return mp, ErrConverValue
@@ -36,6 +36,9 @@ func ParseMetricURL(u string) (MetricPayload, error) {
 		}
 		mp.MetricName = arr[1]
 	case "gauge":
+		if len(arr) < 3 {
+			return mp, ErrEmptyMetricName
+		}
 		mp.MetricType = "gauge"
 		f, err := strconv.ParseFloat(arr[2], 32)
 		if err != nil {

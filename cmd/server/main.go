@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/DeneesK/metrics-alerting/cmd/server/memstorage"
@@ -25,7 +24,6 @@ func update(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 		res.WriteHeader(http.StatusOK)
-		fmt.Printf("gauge: %v\ncounter: %v\n", metricsStorage.Gauge, metricsStorage.Counter)
 		return
 	}
 	res.WriteHeader(http.StatusMethodNotAllowed)
