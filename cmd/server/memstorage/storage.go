@@ -7,6 +7,11 @@ type MemStorage struct {
 	Counter map[string]int
 }
 
+const (
+	counterMetric string = "counter"
+	gaugeMetric   string = "gauge"
+)
+
 func NewMemStorage() MemStorage {
 	return MemStorage{Gauge: make(map[string]float32), Counter: make(map[string]int)}
 }
@@ -16,10 +21,11 @@ func SaveMetrics(u string, storage *MemStorage) error {
 	if err != nil {
 		return err
 	}
-	if m.MetricType == "counter" {
+	switch m.MetricType {
+	case counterMetric:
 		storage.Counter[m.MetricName] += m.CounterValue
-		return nil
+	case gaugeMetric:
+		storage.Gauge[m.MetricName] = m.CaugeValue
 	}
-	storage.Gauge[m.MetricName] = m.CaugeValue
 	return nil
 }
