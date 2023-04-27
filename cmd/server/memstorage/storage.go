@@ -12,7 +12,7 @@ func NewMemStorage() MemStorage {
 }
 
 func SaveMetrics(u string, storage *MemStorage) error {
-	m, err := urlparser.ParseMetricUrl(u)
+	m, err := urlparser.ParseMetricURL(u)
 	if err != nil {
 		return err
 	}

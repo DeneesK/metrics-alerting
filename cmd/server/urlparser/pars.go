@@ -17,7 +17,7 @@ type MetricPayload struct {
 	CounterValue int
 }
 
-func ParseMetricUrl(u string) (MetricPayload, error) {
+func ParseMetricURL(u string) (MetricPayload, error) {
 	mp := MetricPayload{}
 	arr := strings.Split(u, "/")[2:]
 	if len(arr) < 3 {
