@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-var ErrConverValue = errors.New("invalid type of value")
+var ErrConvertValue = errors.New("invalid type of value")
 var ErrMetricType = errors.New("invalid type of metric")
 var ErrEmptyMetricName = errors.New("missed metric name")
 
@@ -33,7 +33,7 @@ func ParseMetricURL(u string) (MetricPayload, error) {
 		}
 		n, err := strconv.Atoi(arr[2])
 		if err != nil {
-			return mp, ErrConverValue
+			return mp, ErrConvertValue
 		}
 		mp.CounterValue = n
 		if len(arr) < 3 {
@@ -41,13 +41,13 @@ func ParseMetricURL(u string) (MetricPayload, error) {
 		}
 		mp.MetricName = arr[1]
 	case gaugeMetric:
+		mp.MetricType = gaugeMetric
 		if len(arr) < 3 {
 			return mp, ErrEmptyMetricName
 		}
-		mp.MetricType = gaugeMetric
 		f, err := strconv.ParseFloat(arr[2], 32)
 		if err != nil {
-			return mp, ErrConverValue
+			return mp, ErrConvertValue
 		}
 		mp.CaugeValue = float32(f)
 		mp.MetricName = arr[1]

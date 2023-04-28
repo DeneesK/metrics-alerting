@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 
@@ -9,13 +8,13 @@ import (
 	"github.com/DeneesK/metrics-alerting/cmd/server/urlparser"
 )
 
-func update(storage *memstorage.MemStorage) http.HandlerFunc {
+func update(storage memstorage.Repository) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		if req.Method == http.MethodPost {
-			err := memstorage.SaveMetrics(req.URL.String(), storage)
+			err := storage.StoreMetrics(req.URL.String())
 			if err != nil {
 				switch err {
-				case urlparser.ErrConverValue:
+				case urlparser.ErrConvertValue:
 					res.WriteHeader(http.StatusBadRequest)
 				case urlparser.ErrMetricType:
 					res.WriteHeader(http.StatusBadRequest)
@@ -25,7 +24,6 @@ func update(storage *memstorage.MemStorage) http.HandlerFunc {
 				return
 			}
 			res.WriteHeader(http.StatusOK)
-			fmt.Printf("gauge: %v\ncounter: %v\n", storage.Gauge, storage.Counter)
 			return
 		}
 		res.WriteHeader(http.StatusMethodNotAllowed)
