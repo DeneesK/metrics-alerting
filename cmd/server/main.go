@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -23,7 +24,9 @@ func update(storage memstorage.Repository) http.HandlerFunc {
 				}
 				return
 			}
+			res.Header().Add("Content-Type", "text/plain; charset=utf-8")
 			res.WriteHeader(http.StatusOK)
+			fmt.Println(storage)
 			return
 		}
 		res.WriteHeader(http.StatusMethodNotAllowed)
@@ -34,5 +37,6 @@ func main() {
 	mux := http.NewServeMux()
 	metricsStorage := memstorage.NewMemStorage()
 	mux.HandleFunc("/update/", update(&metricsStorage))
+	log.Println("server started at :8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))
 }
