@@ -51,6 +51,7 @@ func Test_sendReport(t *testing.T) {
 			assert.Equal(t, resp.StatusCode, test.wantCode)
 			buff := make([]byte, resp.ContentLength)
 			resp.Body.Read(buff)
+			defer resp.Body.Close()
 			respBody := bytes.NewBuffer(buff).String()
 			assert.Equal(t, respBody, test.wantResp)
 		})
