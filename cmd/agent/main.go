@@ -28,10 +28,13 @@ func sendMetrics(ms *metric.MetricStats) {
 	log.Println("sending... metric stats")
 	for k, v := range metrics {
 		url := urlpreparer.PrepareURL(k, gaugeMetric, v)
-		sendReport(url, contentType)
+		resp, _ := sendReport(url, contentType)
+		defer resp.Body.Close()
 	}
-	sendReport(urlpreparer.PrepareURL("RandomValue", gaugeMetric, float32(ms.RandomValue)), contentType)
-	sendReport(urlpreparer.PrepareURL("PollCount", counterMetric, float32(ms.PollCount)), contentType)
+	resp1, _ := sendReport(urlpreparer.PrepareURL("RandomValue", gaugeMetric, float32(ms.RandomValue)), contentType)
+	resp2, _ := sendReport(urlpreparer.PrepareURL("PollCount", counterMetric, float32(ms.PollCount)), contentType)
+	defer resp1.Body.Close()
+	defer resp2.Body.Close()
 }
 
 func main() {
