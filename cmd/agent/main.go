@@ -1,13 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"log"
-	"net/http"
 	"time"
 
 	metric "github.com/DeneesK/metrics-alerting/cmd/agent/metriccollector"
 	"github.com/DeneesK/metrics-alerting/cmd/agent/urlpreparer"
+	"github.com/levigross/grequests"
 )
 
 const (
@@ -17,30 +16,28 @@ const (
 	contentType    string        = "text/plain"
 )
 
-func sendReport(url string, contentType string) (resp *http.Response, err error) {
-	buff := make([]byte, 0)
-	return http.Post(url, contentType, bytes.NewBuffer(buff))
+func sendReport(s *grequests.Session, url string) (*grequests.Response, error) {
+	return s.Post(url, s.RequestOptions)
 }
 
 func sendMetrics(ms *metric.MetricStats) {
 	time.Sleep(reportInterval * time.Second)
 	metrics := urlpreparer.ParseNeededStats(ms.Stats)
-	log.Println("sending... metric stats")
+	ro := grequests.RequestOptions{Headers: map[string]string{"Content-Type": contentType}}
+	session := grequests.NewSession(&ro)
+	defer session.CloseIdleConnections()
 	for k, v := range metrics {
 		url := urlpreparer.PrepareURL(k, gaugeMetric, v)
-		resp, _ := sendReport(url, contentType)
-		defer resp.Body.Close()
+		sendReport(session, url)
 	}
-	resp1, _ := sendReport(urlpreparer.PrepareURL("RandomValue", gaugeMetric, float32(ms.RandomValue)), contentType)
-	resp2, _ := sendReport(urlpreparer.PrepareURL("PollCount", counterMetric, float32(ms.PollCount)), contentType)
-	defer resp1.Body.Close()
-	defer resp2.Body.Close()
+	sendReport(session, urlpreparer.PrepareURL("RandomValue", gaugeMetric, float32(ms.RandomValue)))
+	sendReport(session, urlpreparer.PrepareURL("PollCount", counterMetric, float32(ms.PollCount)))
 }
 
 func main() {
 	ms := metric.NewMetricStats()
 	go ms.StartCollect()
-	log.Println("metric collector started")
+	log.Println("client started")
 	for {
 		sendMetrics(&ms)
 	}

@@ -1,10 +1,6 @@
 package memstorage
 
-import "github.com/DeneesK/metrics-alerting/cmd/server/urlparser"
-
-type Repository interface {
-	StoreMetrics(string) error
-}
+import "strconv"
 
 type MemStorage struct {
 	Gauge   map[string]float32
@@ -20,16 +16,13 @@ func NewMemStorage() MemStorage {
 	return MemStorage{Gauge: make(map[string]float32), Counter: make(map[string]int)}
 }
 
-func (storage *MemStorage) StoreMetrics(str string) error {
-	m, err := urlparser.ParseMetricURL(str)
-	if err != nil {
-		return err
-	}
-	switch m.MetricType {
+func (storage *MemStorage) StoreMetrics(t, name, value string) {
+	switch t {
 	case counterMetric:
-		storage.Counter[m.MetricName] += m.CounterValue
+		v, _ := strconv.Atoi(value)
+		storage.Counter[name] += v
 	case gaugeMetric:
-		storage.Gauge[m.MetricName] = m.CaugeValue
+		v, _ := strconv.ParseFloat(value, 32)
+		storage.Gauge[name] = float32(v)
 	}
-	return nil
 }

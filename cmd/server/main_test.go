@@ -7,6 +7,7 @@ import (
 
 	"github.com/DeneesK/metrics-alerting/cmd/server/memstorage"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_update(t *testing.T) {
@@ -28,32 +29,35 @@ func Test_update(t *testing.T) {
 			},
 		},
 		{
-			name: "negative test: empty value #1",
-			args: "/update/counter/metric/",
+			name: "negative test: wrong value #1",
+			args: "/update/counter/metric/b",
 			want: want{
 				code:        400,
 				contentType: "",
 			},
 		},
 		{
-			name: "negative test: missing metric name #1",
+			name: "negative test: missing metric name #2",
 			args: "/update/counter/",
 			want: want{
 				code:        404,
-				contentType: "",
+				contentType: "text/plain; charset=utf-8",
 			},
 		},
 	}
+	ms := memstorage.NewMemStorage()
+	ts := httptest.NewServer(UpdateRouter(ms))
+	defer ts.Close()
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ms := memstorage.NewMemStorage()
-			request := httptest.NewRequest(http.MethodPost, test.args, nil)
-			w := httptest.NewRecorder()
-			update(&ms)(w, request)
-			res := w.Result()
-			defer res.Body.Close()
-			assert.Equal(t, res.StatusCode, test.want.code)
-			assert.Equal(t, res.Header.Get("Content-Type"), test.want.contentType)
+			request, err := http.NewRequest(http.MethodPost, ts.URL+test.args, nil)
+			require.NoError(t, err)
+			resp, err := ts.Client().Do(request)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, resp.StatusCode, test.want.code)
+			assert.Equal(t, resp.Header.Get("Content-Type"), test.want.contentType)
 		})
 	}
 }

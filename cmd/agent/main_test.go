@@ -1,12 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 
+	"github.com/levigross/grequests"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,7 +18,7 @@ func Test_sendReport(t *testing.T) {
 	tests := []struct {
 		name           string
 		args           args
-		wantResp       string
+		wantURL        string
 		wantContenType string
 		wantCode       int
 	}{
@@ -28,32 +28,28 @@ func Test_sendReport(t *testing.T) {
 				url:         "update/gauge/metric/1.5",
 				contentType: "text/plain",
 			},
-			wantResp:       "/update/gauge/metric/1.5",
-			wantContenType: "text/plain; charset=utf-8",
+			wantURL:        "/update/gauge/metric/1.5",
+			wantContenType: "text/plain",
 			wantCode:       200,
 		},
 	}
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			w.WriteHeader(http.StatusOK)
-			w.Header().Add("Content-Type", r.Header.Get("Content-Type"))
-			w.Write([]byte(r.URL.String()))
-		}
-		w.WriteHeader(http.StatusMethodNotAllowed)
-	}))
-	defer ts.Close()
+	ro := grequests.RequestOptions{Headers: map[string]string{"Content-Type": "text/plain"}}
+	session := grequests.NewSession(&ro)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodPost {
+					assert.Equal(t, r.URL.String(), test.wantURL)
+					assert.Equal(t, r.Header.Get("Content-Type"), test.wantContenType)
+					w.WriteHeader(http.StatusOK)
+				}
+				w.WriteHeader(http.StatusMethodNotAllowed)
+			}))
 			url, _ := url.JoinPath(ts.URL, test.args.url)
-			resp, err := sendReport(url, test.args.contentType)
+			resp, err := sendReport(session, url)
 			assert.NoError(t, err)
-			assert.Equal(t, resp.Header.Get("Content-Type"), test.wantContenType)
 			assert.Equal(t, resp.StatusCode, test.wantCode)
-			buff := make([]byte, resp.ContentLength)
-			resp.Body.Read(buff)
-			defer resp.Body.Close()
-			respBody := bytes.NewBuffer(buff).String()
-			assert.Equal(t, respBody, test.wantResp)
+			ts.Close()
 		})
 	}
 }
