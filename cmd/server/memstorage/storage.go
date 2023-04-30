@@ -6,7 +6,7 @@ import (
 )
 
 type MemStorage struct {
-	Gauge   map[string]float32
+	Gauge   map[string]float64
 	Counter map[string]int
 }
 
@@ -16,7 +16,7 @@ const (
 )
 
 func NewMemStorage() MemStorage {
-	return MemStorage{Gauge: make(map[string]float32), Counter: make(map[string]int)}
+	return MemStorage{Gauge: make(map[string]float64), Counter: make(map[string]int)}
 }
 
 func (storage *MemStorage) StoreMetrics(t, name, value string) {
@@ -25,8 +25,8 @@ func (storage *MemStorage) StoreMetrics(t, name, value string) {
 		v, _ := strconv.Atoi(value)
 		storage.Counter[name] += v
 	case gaugeMetric:
-		v, _ := strconv.ParseFloat(value, 32)
-		storage.Gauge[name] = float32(v)
+		v, _ := strconv.ParseFloat(value, 64)
+		storage.Gauge[name] = v
 	}
 }
 
