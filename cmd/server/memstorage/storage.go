@@ -43,7 +43,7 @@ func (storage *MemStorage) Value(t, name string) string {
 		if !ok {
 			return ""
 		}
-		return fmt.Sprintf("%f", v)
+		return fmt.Sprintf("%.3f", v)
 	}
 	return ""
 }
