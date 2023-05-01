@@ -10,8 +10,8 @@ import (
 )
 
 type Repository interface {
-	StoreMetrics(type_, name, value string)
-	Value(type_, name string) string
+	StoreMetrics(typeMetric, name, value string)
+	Value(typeMetric, name string) string
 	Metrics() string
 }
 
