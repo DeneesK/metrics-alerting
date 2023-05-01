@@ -12,7 +12,7 @@ import (
 var (
 	counterMetric  string        = "counter"
 	gaugeMetric    string        = "gauge"
-	reportInterval time.Duration = time.Duration(flagreportInterval)
+	reportInterval time.Duration = 2
 	contentType    string        = "text/plain"
 )
 
@@ -27,7 +27,7 @@ func sendMetrics(ms *metric.MetricStats) {
 	session := grequests.NewSession(&ro)
 	defer session.CloseIdleConnections()
 	for k, v := range metrics {
-		url := urlpreparer.PrepareURL(flagRunAddr, k, gaugeMetric, v)
+		url := urlpreparer.PrepareURL(flagRunAddr, gaugeMetric, k, v)
 		sendReport(session, url)
 	}
 	sendReport(session, urlpreparer.PrepareURL(flagRunAddr, "RandomValue", gaugeMetric, float64(ms.RandomValue)))

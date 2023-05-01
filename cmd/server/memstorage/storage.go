@@ -54,7 +54,7 @@ func (storage *MemStorage) Metrics() string {
 		result += fmt.Sprintf("[%s]: %d\n", k, v)
 	}
 	for k, v := range storage.Gauge {
-		result += fmt.Sprintf("[%s]: %f\n", k, v)
+		result += fmt.Sprintf("[%s]: %g\n", k, v)
 	}
 	return result
 }
