@@ -68,17 +68,17 @@ func metrics(storage Repository) http.HandlerFunc {
 }
 
 func main() {
-	r := chi.NewRouter()
+	parseFlags()
 	metricsStorage := memstorage.NewMemStorage()
-	r.Post("/update/{metricType}/{metricName}/{value}", update(&metricsStorage))
-	r.Get("/value/{metricType}/{metricName}", value(&metricsStorage))
-	r.Get("/", metrics(&metricsStorage))
-	log.Println("server started at :8080")
-	log.Fatal(http.ListenAndServe(":8080", r))
+	r := Routers(metricsStorage)
+	log.Printf("server started at %s", flagRunAddr)
+	log.Fatal(http.ListenAndServe(flagRunAddr, r))
 }
 
-func UpdateRouter(ms memstorage.MemStorage) chi.Router {
+func Routers(ms memstorage.MemStorage) chi.Router {
 	r := chi.NewRouter()
 	r.Post("/update/{metricType}/{metricName}/{value}", update(&ms))
+	r.Get("/value/{metricType}/{metricName}", value(&ms))
+	r.Get("/", metrics(&ms))
 	return r
 }
