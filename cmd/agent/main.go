@@ -9,10 +9,10 @@ import (
 	"github.com/levigross/grequests"
 )
 
-const (
+var (
 	counterMetric  string        = "counter"
 	gaugeMetric    string        = "gauge"
-	reportInterval time.Duration = 10
+	reportInterval time.Duration = time.Duration(flagreportInterval)
 	contentType    string        = "text/plain"
 )
 
@@ -27,15 +27,16 @@ func sendMetrics(ms *metric.MetricStats) {
 	session := grequests.NewSession(&ro)
 	defer session.CloseIdleConnections()
 	for k, v := range metrics {
-		url := urlpreparer.PrepareURL(k, gaugeMetric, v)
+		url := urlpreparer.PrepareURL(flagRunAddr, k, gaugeMetric, v)
 		sendReport(session, url)
 	}
-	sendReport(session, urlpreparer.PrepareURL("RandomValue", gaugeMetric, float32(ms.RandomValue)))
-	sendReport(session, urlpreparer.PrepareURL("PollCount", counterMetric, float32(ms.PollCount)))
+	sendReport(session, urlpreparer.PrepareURL(flagRunAddr, "RandomValue", gaugeMetric, float64(ms.RandomValue)))
+	sendReport(session, urlpreparer.PrepareURL(flagRunAddr, "PollCount", counterMetric, float64(ms.PollCount)))
 }
 
 func main() {
-	ms := metric.NewMetricStats()
+	parseFlags()
+	ms := metric.NewMetricStats(flagpolltInterval)
 	go ms.StartCollect()
 	log.Println("client started")
 	for {

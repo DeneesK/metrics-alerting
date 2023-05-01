@@ -22,14 +22,12 @@ func update(storage Repository) http.HandlerFunc {
 		valueString := chi.URLParam(req, "value")
 		switch metricType {
 		case "gauge":
-			_, err := strconv.ParseFloat(valueString, 32)
-			if err != nil {
+			if _, err := strconv.ParseFloat(valueString, 64); err != nil {
 				res.WriteHeader(http.StatusBadRequest)
 				return
 			}
 		case "counter":
-			_, err := strconv.Atoi(valueString)
-			if err != nil {
+			if _, err := strconv.Atoi(valueString); err != nil {
 				res.WriteHeader(http.StatusBadRequest)
 				return
 			}

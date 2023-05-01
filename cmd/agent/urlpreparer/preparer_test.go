@@ -10,7 +10,7 @@ func TestPrepareURL(t *testing.T) {
 	type args struct {
 		metricType string
 		metricName string
-		value      float32
+		value      float64
 	}
 	type want struct {
 		result string
@@ -31,7 +31,7 @@ func TestPrepareURL(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			res := PrepareURL(test.args.metricType, test.args.metricName, test.args.value)
+			res := PrepareURL("http://localhost:8080", test.args.metricType, test.args.metricName, test.args.value)
 			assert.Equal(t, res, test.want.result)
 		})
 	}

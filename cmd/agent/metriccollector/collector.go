@@ -16,8 +16,8 @@ type MetricStats struct {
 	pollInterval time.Duration
 }
 
-func NewMetricStats() MetricStats {
-	return MetricStats{pollInterval: 2}
+func NewMetricStats(pollInt int) MetricStats {
+	return MetricStats{pollInterval: time.Duration(pollInt)}
 }
 
 func (ms *MetricStats) PollStats() {
