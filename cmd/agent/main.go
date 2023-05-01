@@ -22,7 +22,7 @@ func sendReport(s *grequests.Session, url string) (*grequests.Response, error) {
 
 func sendMetrics(ms *metric.MetricStats) {
 	time.Sleep(reportInterval * time.Second)
-	metrics := urlpreparer.ParseNeededStats(ms.Stats)
+	metrics := ParseNeededStats(ms.Stats)
 	ro := grequests.RequestOptions{Headers: map[string]string{"Content-Type": contentType}}
 	session := grequests.NewSession(&ro)
 	defer session.CloseIdleConnections()
