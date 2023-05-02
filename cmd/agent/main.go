@@ -12,7 +12,7 @@ import (
 var (
 	counterMetric  string        = "counter"
 	gaugeMetric    string        = "gauge"
-	reportInterval time.Duration = 2
+	reportInterval time.Duration = 1
 	contentType    string        = "text/plain"
 )
 
