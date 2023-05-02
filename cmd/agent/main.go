@@ -12,7 +12,7 @@ import (
 var (
 	counterMetric  string        = "counter"
 	gaugeMetric    string        = "gauge"
-	reportInterval time.Duration = 1
+	reportInterval time.Duration = time.Second * time.Duration(flagreportInterval)
 	contentType    string        = "text/plain"
 )
 
@@ -38,7 +38,7 @@ func main() {
 	parseFlags()
 	ms := metric.NewMetricStats(flagpolltInterval)
 	go ms.StartCollect()
-	log.Println("client started")
+	log.Printf("client started sending data on %s", flagRunAddr)
 	for {
 		sendMetrics(&ms)
 	}
