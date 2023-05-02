@@ -67,10 +67,9 @@ func metrics(storage Repository) http.HandlerFunc {
 
 func main() {
 	parseFlags()
-	metricsStorage := memstorage.NewMemStorage()
-	r := Routers(metricsStorage)
-	log.Printf("server started at %s", flagRunAddr)
-	log.Fatal(http.ListenAndServe(flagRunAddr, r))
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func Routers(ms memstorage.MemStorage) chi.Router {
@@ -79,4 +78,11 @@ func Routers(ms memstorage.MemStorage) chi.Router {
 	r.Get("/value/{metricType}/{metricName}", value(&ms))
 	r.Get("/", metrics(&ms))
 	return r
+}
+
+func run() error {
+	metricsStorage := memstorage.NewMemStorage()
+	r := Routers(metricsStorage)
+	log.Printf("server started at %s", flagRunAddr)
+	return http.ListenAndServe(flagRunAddr, r)
 }
