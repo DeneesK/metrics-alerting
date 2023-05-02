@@ -30,8 +30,8 @@ func (storage *MemStorage) StoreMetrics(t, name, value string) {
 	}
 }
 
-func (storage *MemStorage) Value(t, name string) string {
-	switch t {
+func (storage *MemStorage) Value(typeMetric, name string) string {
+	switch typeMetric {
 	case counterMetric:
 		v, ok := storage.Counter[name]
 		if !ok {
