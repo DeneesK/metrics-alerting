@@ -1,4 +1,4 @@
-package memstorage
+package storage
 
 import (
 	"fmt"
@@ -19,7 +19,7 @@ func NewMemStorage() MemStorage {
 	return MemStorage{Gauge: make(map[string]float64), Counter: make(map[string]int)}
 }
 
-func (storage *MemStorage) StoreMetrics(t, name, value string) {
+func (storage *MemStorage) Store(t, name, value string) {
 	switch t {
 	case counterMetric:
 		v, _ := strconv.Atoi(value)
@@ -30,7 +30,7 @@ func (storage *MemStorage) StoreMetrics(t, name, value string) {
 	}
 }
 
-func (storage *MemStorage) Value(typeMetric, name string) string {
+func (storage *MemStorage) GetValue(typeMetric, name string) string {
 	switch typeMetric {
 	case counterMetric:
 		v, ok := storage.Counter[name]
@@ -48,7 +48,7 @@ func (storage *MemStorage) Value(typeMetric, name string) string {
 	return ""
 }
 
-func (storage *MemStorage) Metrics() string {
+func (storage *MemStorage) GetAll() string {
 	result := ""
 	for k, v := range storage.Counter {
 		result += fmt.Sprintf("[%s]: %d\n", k, v)

@@ -5,7 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/DeneesK/metrics-alerting/cmd/server/memstorage"
+	"github.com/DeneesK/metrics-alerting/internal/api"
+	"github.com/DeneesK/metrics-alerting/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,8 +46,8 @@ func Test_update(t *testing.T) {
 			},
 		},
 	}
-	ms := memstorage.NewMemStorage()
-	ts := httptest.NewServer(Routers(ms))
+	ms := storage.NewMemStorage()
+	ts := httptest.NewServer(api.Routers(&ms))
 	defer ts.Close()
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"net/http"
@@ -7,13 +7,21 @@ import (
 	"github.com/go-chi/chi"
 )
 
-type Repository interface {
-	StoreMetrics(typeMetric, name, value string)
-	Value(typeMetric, name string) string
-	Metrics() string
+type Store interface {
+	Store(typeMetric, name, value string)
+	GetValue(typeMetric, name string) string
+	GetAll() string
 }
 
-func update(storage Repository) http.HandlerFunc {
+func Routers(ms Store) chi.Router {
+	r := chi.NewRouter()
+	r.Post("/update/{metricType}/{metricName}/{value}", update(ms))
+	r.Get("/value/{metricType}/{metricName}", value(ms))
+	r.Get("/", metrics(ms))
+	return r
+}
+
+func update(storage Store) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		metricType := chi.URLParam(req, "metricType")
 		metricName := chi.URLParam(req, "metricName")
@@ -33,17 +41,17 @@ func update(storage Repository) http.HandlerFunc {
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		storage.StoreMetrics(metricType, metricName, valueString)
+		storage.Store(metricType, metricName, valueString)
 		res.Header().Add("Content-Type", "text/plain; charset=utf-8")
 		res.WriteHeader(http.StatusOK)
 	}
 }
 
-func value(storage Repository) http.HandlerFunc {
+func value(storage Store) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		metricType := chi.URLParam(req, "metricType")
 		metricName := chi.URLParam(req, "metricName")
-		value := storage.Value(metricType, metricName)
+		value := storage.GetValue(metricType, metricName)
 		if value != "" {
 			res.Write([]byte(value))
 			res.Header().Add("Content-Type", "text/plain; charset=utf-8")
@@ -54,9 +62,9 @@ func value(storage Repository) http.HandlerFunc {
 	}
 }
 
-func metrics(storage Repository) http.HandlerFunc {
+func metrics(storage Store) http.HandlerFunc {
 	return func(res http.ResponseWriter, _ *http.Request) {
-		r := storage.Metrics()
+		r := storage.GetAll()
 		res.Write([]byte(r))
 		res.Header().Add("Content-Type", "text/plain; charset=utf-8")
 		res.WriteHeader(http.StatusOK)

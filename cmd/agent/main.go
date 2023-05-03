@@ -3,12 +3,12 @@ package main
 import (
 	"log"
 
-	metric "github.com/DeneesK/metrics-alerting/cmd/agent/metriccollector"
+	"github.com/DeneesK/metrics-alerting/internal/services/metriccollector"
 )
 
 func main() {
 	parseFlags()
-	ms := metric.NewMetricStats(flagpolltInterval)
+	ms := metriccollector.NewCollector(flagpolltInterval)
 	go ms.StartCollect()
 	log.Printf("client started sending data on %s", flagRunAddr)
 	for {
