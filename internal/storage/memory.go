@@ -42,7 +42,7 @@ func (c *counter) LoadAll() map[string]int {
 func (c *counter) Store(key string, value int) {
 	c.mx.Lock()
 	defer c.mx.Unlock()
-	c.c[key] = value
+	c.c[key] += value
 }
 
 func (g *gauge) Load(key string) (float64, bool) {
