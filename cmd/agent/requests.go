@@ -34,7 +34,7 @@ func sendMetrics(ms metriccollector.Collector) {
 		}
 		_, err = sendReport(session, url)
 		if err != nil {
-			log.Panicln(err)
+			log.Println(err)
 		}
 	}
 	url, err := urlpreparer.PrepareURL(RunAddr, "RandomValue", gaugeMetric, ms.GetRandomValue())
@@ -43,7 +43,7 @@ func sendMetrics(ms metriccollector.Collector) {
 	} else {
 		_, err = sendReport(session, url)
 		if err != nil {
-			log.Panicln(err)
+			log.Println(err)
 		}
 	}
 	url, err = urlpreparer.PrepareURL(RunAddr, "PollCount", counterMetric, float64(ms.GetPollCount()))
@@ -52,7 +52,7 @@ func sendMetrics(ms metriccollector.Collector) {
 	} else {
 		_, err = sendReport(session, url)
 		if err != nil {
-			log.Panicln(err)
+			log.Println(err)
 		}
 	}
 }
