@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"time"
 
 	"github.com/DeneesK/metrics-alerting/internal/services/metriccollector"
@@ -11,7 +12,7 @@ import (
 var (
 	counterMetric  string        = "counter"
 	gaugeMetric    string        = "gauge"
-	reportInterval time.Duration = time.Second * time.Duration(flagreportInterval)
+	reportInterval time.Duration = time.Second * time.Duration(ReportInterval)
 	contentType    string        = "text/plain"
 )
 
@@ -26,9 +27,32 @@ func sendMetrics(ms metriccollector.Collector) {
 	session := grequests.NewSession(&ro)
 	defer session.CloseIdleConnections()
 	for k, v := range metrics {
-		url := urlpreparer.PrepareURL(flagRunAddr, gaugeMetric, k, v)
-		sendReport(session, url)
+		url, err := urlpreparer.PrepareURL(RunAddr, gaugeMetric, k, v)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		_, err = sendReport(session, url)
+		if err != nil {
+			log.Panicln(err)
+		}
 	}
-	sendReport(session, urlpreparer.PrepareURL(flagRunAddr, "RandomValue", gaugeMetric, ms.GetRandomValue()))
-	sendReport(session, urlpreparer.PrepareURL(flagRunAddr, "PollCount", counterMetric, float64(ms.GetPollCount())))
+	url, err := urlpreparer.PrepareURL(RunAddr, "RandomValue", gaugeMetric, ms.GetRandomValue())
+	if err != nil {
+		log.Println(err)
+	} else {
+		_, err = sendReport(session, url)
+		if err != nil {
+			log.Panicln(err)
+		}
+	}
+	url, err = urlpreparer.PrepareURL(RunAddr, "PollCount", counterMetric, float64(ms.GetPollCount()))
+	if err != nil {
+		log.Println(err)
+	} else {
+		_, err = sendReport(session, url)
+		if err != nil {
+			log.Panicln(err)
+		}
+	}
 }

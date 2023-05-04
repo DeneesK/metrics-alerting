@@ -2,16 +2,14 @@ package urlpreparer
 
 import (
 	"fmt"
-	"log"
 	"net/url"
 )
 
-func PrepareURL(basePath string, metricType string, metricName string, value float64) string {
+func PrepareURL(basePath string, metricType string, metricName string, value float64) (string, error) {
 	v := fmt.Sprintf("%f", value)
 	u, err := url.JoinPath("http://", basePath, "update", metricType, metricName, v)
 	if err != nil {
-		log.Println(err)
-		return ""
+		return "", fmt.Errorf("PrepareURL failed: %v", err)
 	}
-	return u
+	return u, nil
 }

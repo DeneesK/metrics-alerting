@@ -8,9 +8,6 @@ import (
 	"github.com/fatih/structs"
 )
 
-type gauge float64
-type counter int
-
 var stats = []string{"Alloc", "BuckHashSys", "Frees", "GCSys", "HeapAlloc", "HeapIdle", "HeapInuse", "HeapObjects", "HeapReleased", "HeapSys", "LastGC", "Lookups", "MCacheInuse", "MCacheSys", "MSpanInuse", "MSpanSys", "Mallocs", "NextGC", "OtherSys", "PauseTotalNs", "StackInuse", "StackSys", "Sys", "TotalAlloc"}
 
 type Collector interface {
@@ -22,8 +19,8 @@ type Collector interface {
 
 type Metrics struct {
 	stats        runtime.MemStats
-	pollCount    counter
-	randomValue  gauge
+	pollCount    int
+	randomValue  float64
 	pollInterval time.Duration
 }
 
@@ -33,7 +30,7 @@ func NewCollector(pollInterval int) Metrics {
 
 func (ms *Metrics) pollMetrics() {
 	runtime.ReadMemStats(&ms.stats)
-	ms.randomValue = gauge(rand.Float32())
+	ms.randomValue = float64(rand.Float32())
 	ms.pollCount += 1
 	time.Sleep(ms.pollInterval * time.Second)
 }

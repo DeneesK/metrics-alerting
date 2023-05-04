@@ -2,28 +2,35 @@ package main
 
 import (
 	"flag"
+	"log"
 	"os"
 	"strconv"
 )
 
-var flagRunAddr string
-var flagreportInterval int
-var flagpolltInterval int
+var RunAddr string
+var ReportInterval int
+var PollInterval int
 
 func parseFlags() {
-	flag.StringVar(&flagRunAddr, "a", "localhost:8080", "address and port to run server")
-	flag.IntVar(&flagreportInterval, "r", 10, "override reportInterval - the frequency of sending metrics to the server")
-	flag.IntVar(&flagpolltInterval, "p", 2, "override pollInterval - the frequency of polling metrics from the runtime package")
+	flag.StringVar(&RunAddr, "a", "localhost:8080", "address and port to run server")
+	flag.IntVar(&ReportInterval, "r", 10, "interval of sending metrics to the server")
+	flag.IntVar(&PollInterval, "p", 2, "interval of polling metrics from the runtime package")
 	flag.Parse()
-	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
-		flagRunAddr = envRunAddr
+	if envRunAddr, ok := os.LookupEnv("ADDRESS"); ok {
+		RunAddr = envRunAddr
 	}
-	if envreportInterval := os.Getenv("REPORT_INTERVAL"); envreportInterval != "" {
-		fri, _ := strconv.Atoi(envreportInterval)
-		flagreportInterval = fri
+	if envreportInterval, ok := os.LookupEnv("REPORT_INTERVAL"); ok {
+		fri, err := strconv.Atoi(envreportInterval)
+		if err != nil {
+			log.Fatal("The value of the REPORT_INTERVAL environment variable is not a integer.")
+		}
+		ReportInterval = fri
 	}
-	if envpolltInterval := os.Getenv("POLL_INTERVAL "); envpolltInterval != "" {
-		fpi, _ := strconv.Atoi(envpolltInterval)
-		flagpolltInterval = fpi
+	if envpolltInterval, ok := os.LookupEnv("POLL_INTERVAL "); ok {
+		fpi, err := strconv.Atoi(envpolltInterval)
+		if err != nil {
+			log.Fatal("The value of the POLL_INTERVAL environment variable is not a integer.")
+		}
+		PollInterval = fpi
 	}
 }

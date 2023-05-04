@@ -1,16 +1,23 @@
 package api
 
 import (
+	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi"
 )
 
+const (
+	contentTypeText = "text/plain; charset=utf-8"
+)
+
 type Store interface {
-	Store(typeMetric, name, value string)
-	GetValue(typeMetric, name string) string
-	GetAll() string
+	Store(typeMetric, name, value string) error
+	GetValue(typeMetric, name string) (string, bool, error)
+	GetCounterMetrics() map[string]int
+	GetGaugeMetrics() map[string]float64
 }
 
 func Routers(ms Store) chi.Router {
@@ -33,7 +40,7 @@ func update(storage Store) http.HandlerFunc {
 				return
 			}
 		case "counter":
-			if _, err := strconv.Atoi(valueString); err != nil {
+			if _, err := strconv.ParseInt(valueString, 10, 64); err != nil {
 				res.WriteHeader(http.StatusBadRequest)
 				return
 			}
@@ -42,7 +49,7 @@ func update(storage Store) http.HandlerFunc {
 			return
 		}
 		storage.Store(metricType, metricName, valueString)
-		res.Header().Add("Content-Type", "text/plain; charset=utf-8")
+		res.Header().Add("Content-Type", contentTypeText)
 		res.WriteHeader(http.StatusOK)
 	}
 }
@@ -51,12 +58,15 @@ func value(storage Store) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		metricType := chi.URLParam(req, "metricType")
 		metricName := chi.URLParam(req, "metricName")
-		value := storage.GetValue(metricType, metricName)
-		if value != "" {
+		value, ok, err := storage.GetValue(metricType, metricName)
+		if ok {
 			res.Write([]byte(value))
-			res.Header().Add("Content-Type", "text/plain; charset=utf-8")
+			res.Header().Add("Content-Type", contentTypeText)
 			res.WriteHeader(http.StatusOK)
 			return
+		}
+		if err != nil {
+			log.Panicln(err)
 		}
 		res.WriteHeader(http.StatusNotFound)
 	}
@@ -64,9 +74,17 @@ func value(storage Store) http.HandlerFunc {
 
 func metrics(storage Store) http.HandlerFunc {
 	return func(res http.ResponseWriter, _ *http.Request) {
-		r := storage.GetAll()
+		c := storage.GetCounterMetrics()
+		g := storage.GetGaugeMetrics()
+		r := ""
+		for k, v := range c {
+			r += fmt.Sprintf("[%s]: %d\n", k, v)
+		}
+		for k, v := range g {
+			r += fmt.Sprintf("[%s]: %g\n", k, v)
+		}
 		res.Write([]byte(r))
-		res.Header().Add("Content-Type", "text/plain; charset=utf-8")
+		res.Header().Add("Content-Type", contentTypeText)
 		res.WriteHeader(http.StatusOK)
 	}
 }

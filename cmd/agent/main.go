@@ -8,9 +8,9 @@ import (
 
 func main() {
 	parseFlags()
-	ms := metriccollector.NewCollector(flagpolltInterval)
+	ms := metriccollector.NewCollector(PollInterval)
 	go ms.StartCollect()
-	log.Printf("client started sending data on %s", flagRunAddr)
+	log.Printf("client started sending data on %s", RunAddr)
 	for {
 		sendMetrics(&ms)
 	}

@@ -1,6 +1,7 @@
 package urlpreparer
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -31,7 +32,8 @@ func TestPrepareURL(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			res := PrepareURL("localhost:8080", test.args.metricType, test.args.metricName, test.args.value)
+			res, err := PrepareURL("localhost:8080", test.args.metricType, test.args.metricName, test.args.value)
+			fmt.Println(err)
 			assert.Equal(t, res, test.want.result)
 		})
 	}
