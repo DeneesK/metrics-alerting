@@ -30,6 +30,6 @@ func PrepareURL(basePath string, metricType string, metricName string, value int
 		}
 		return u, nil
 	default:
-		return "", fmt.Errorf("unable to create url, value must be float64, uint64 or int? given: %v", valueType)
+		return "", fmt.Errorf("unable to create url, value must be float64, uint64 or int, given: %v", valueType)
 	}
 }
