@@ -49,13 +49,12 @@ func (ms *Metrics) pollMetrics() {
 	ms.mx.Lock()
 	defer ms.mx.Unlock()
 	runtime.ReadMemStats(&ms.stats)
-	ms.randomValue = float64(rand.Float32())
+	ms.randomValue = rand.Float64()
 }
 
 func (ms *Metrics) StartCollect() {
 	for {
 		ms.pollMetrics()
-		ms.pollCount += 1
 		time.Sleep(ms.pollInterval)
 	}
 }
@@ -107,4 +106,10 @@ func (ms *Metrics) GetPollCount() int64 {
 	ms.mx.Lock()
 	defer ms.mx.Unlock()
 	return ms.pollCount
+}
+
+func (ms *Metrics) IncrementPollCount() {
+	ms.mx.Lock()
+	defer ms.mx.Unlock()
+	ms.pollCount += 1
 }

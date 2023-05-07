@@ -27,7 +27,8 @@ func TestPrepareURL(t *testing.T) {
 				metricType: "gauge",
 			},
 			value: 1.5,
-			want:  want{"http://localhost:8080/update/gauge/metric/1.5"},
+			want:  want{"http://localhost:8080/update/gauge/metric/1.5",
+			},
 		},
 	}
 	for _, test := range tests {

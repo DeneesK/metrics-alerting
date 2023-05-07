@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
-	"time"
 
 	"github.com/DeneesK/metrics-alerting/internal/services/metriccollector"
 	"github.com/DeneesK/metrics-alerting/internal/services/urlpreparer"
@@ -11,10 +9,11 @@ import (
 )
 
 var (
-	counterMetric  string        = "counter"
-	gaugeMetric    string        = "gauge"
-	reportInterval time.Duration = time.Second * time.Duration(reportingInterval)
-	contentType    string        = "text/plain"
+	counterMetric string = "counter"
+	gaugeMetric   string = "gauge"
+	contentType   string = "text/plain"
+	pollCount     string = "PollCount"
+	randomValue   string = "RandomValue"
 )
 
 type Collector interface {
@@ -22,10 +21,7 @@ type Collector interface {
 	GetRuntimeMetrics() metriccollector.RuntimeMetrics
 	GetRandomValue() float64
 	GetPollCount() int64
-}
-
-func sendReport(s *grequests.Session, url string) (*grequests.Response, error) {
-	return s.Post(url, s.RequestOptions)
+	IncrementPollCount()
 }
 
 func sendMetrics(ms Collector) error {
@@ -33,49 +29,45 @@ func sendMetrics(ms Collector) error {
 	cpuMetrics := runtimeMetrics.GetCPUMetrics()
 	memMetrics := runtimeMetrics.GetMemMetrics()
 
+	ms.IncrementPollCount()
+
 	ro := grequests.RequestOptions{Headers: map[string]string{"Content-Type": contentType}}
 	session := grequests.NewSession(&ro)
 	defer session.CloseIdleConnections()
 
 	for k, v := range cpuMetrics {
-		url, err := urlpreparer.PrepareURL(runAddr, gaugeMetric, k, v)
-		if err != nil {
-			return fmt.Errorf("unable to send report: %w", err)
-		}
-		_, err = sendReport(session, url)
-		if err != nil {
-			return fmt.Errorf("unable to send report: %w", err)
+		if err := send(session, gaugeMetric, k, v); err != nil {
+			return err
 		}
 	}
-
 	for k, v := range memMetrics {
-		url, err := urlpreparer.PrepareURL(runAddr, gaugeMetric, k, v)
-		if err != nil {
-			return fmt.Errorf("unable to send report: %w", err)
+		if err := send(session, gaugeMetric, k, v); err != nil {
+			return err
 		}
-		_, err = sendReport(session, url)
-		if err != nil {
-			return fmt.Errorf("unable to send report: %w", err)
-		}
+	}
+	if err := send(session, gaugeMetric, pollCount, ms.GetRandomValue()); err != nil {
+		return err
 	}
 
-	url, err := urlpreparer.PrepareURL(runAddr, "RandomValue", gaugeMetric, ms.GetRandomValue())
-	if err != nil {
-		log.Println(err)
-	} else {
-		_, err = sendReport(session, url)
-		if err != nil {
-			return fmt.Errorf("unable to send report: %w", err)
-		}
+	if err := send(session, counterMetric, randomValue, ms.GetPollCount()); err != nil {
+		return err
 	}
-	url, err = urlpreparer.PrepareURL(runAddr, "PollCount", counterMetric, ms.GetPollCount())
+	return nil
+}
+
+func send(session *grequests.Session, metricType string, metricName string, value interface{}) error {
+	url, err := urlpreparer.PrepareURL(runAddr, metricType, metricName, value)
 	if err != nil {
-		log.Println(err)
+		return fmt.Errorf("unable to send report: %w", err)
 	} else {
-		_, err = sendReport(session, url)
+		_, err = postReport(session, url)
 		if err != nil {
 			return fmt.Errorf("unable to send report: %w", err)
 		}
 	}
 	return nil
+}
+
+func postReport(s *grequests.Session, url string) (*grequests.Response, error) {
+	return s.Post(url, s.RequestOptions)
 }

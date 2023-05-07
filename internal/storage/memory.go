@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 	"sync"
@@ -11,8 +10,6 @@ const (
 	counterMetric string = "counter"
 	gaugeMetric   string = "gauge"
 )
-
-var ErrMetricType = errors.New("metric type does not exist")
 
 type counter struct {
 	mx sync.Mutex
@@ -80,9 +77,6 @@ func NewMemStorage() MemStorage {
 }
 
 func (storage *MemStorage) Store(metricType, name, value string) error {
-	if ok := checkMetricType(metricType); !ok {
-		return ErrMetricType
-	}
 	switch metricType {
 	case counterMetric:
 		v, err := strconv.Atoi(value)
@@ -99,28 +93,25 @@ func (storage *MemStorage) Store(metricType, name, value string) error {
 		storage.gauge.Store(name, v)
 		return nil
 	}
-	return ErrMetricType
+	return fmt.Errorf("metric type does not exist, given type: %v", metricType)
 }
 
 func (storage *MemStorage) GetValue(metricType, name string) (string, bool, error) {
-	if ok := checkMetricType(metricType); !ok {
-		return "", false, ErrMetricType
-	}
 	switch metricType {
 	case counterMetric:
 		v, ok := storage.counter.Load(name)
 		if !ok {
 			return "", false, nil
 		}
-		return fmt.Sprintf("%d", v), true, nil
+		return strconv.FormatInt(v, 9), true, nil
 	case gaugeMetric:
 		v, ok := storage.gauge.Load(name)
 		if !ok {
 			return "", false, nil
 		}
-		return fmt.Sprintf("%g", v), true, nil
+		return strconv.FormatFloat(v, byte(102), -3, 64), true, nil
 	}
-	return "", false, ErrMetricType
+	return "", false, fmt.Errorf("metric type does not exist, given type: %v", metricType)
 }
 
 func (storage *MemStorage) GetCounterMetrics() map[string]int64 {
@@ -129,8 +120,4 @@ func (storage *MemStorage) GetCounterMetrics() map[string]int64 {
 
 func (storage *MemStorage) GetGaugeMetrics() map[string]float64 {
 	return storage.gauge.LoadAll()
-}
-
-func checkMetricType(metricType string) bool {
-	return metricType == counterMetric || metricType == gaugeMetric
 }

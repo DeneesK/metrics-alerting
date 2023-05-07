@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_sendReport(t *testing.T) {
+func Test_postReport(t *testing.T) {
 	type args struct {
 		url         string
 		contentType string
@@ -47,7 +47,7 @@ func Test_sendReport(t *testing.T) {
 			}))
 			url, err := url.JoinPath(ts.URL, test.args.url)
 			assert.NoError(t, err)
-			resp, err := sendReport(session, url)
+			resp, err := postReport(session, url)
 			assert.NoError(t, err)
 			assert.Equal(t, resp.StatusCode, test.wantCode)
 			ts.Close()
