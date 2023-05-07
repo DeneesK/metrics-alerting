@@ -7,7 +7,10 @@ import (
 	"time"
 )
 
-const uint64StatsLen = 15
+const (
+	memStatsLen = 15
+	cpuStatsLen = 1
+)
 
 type Metrics struct {
 	mx           sync.Mutex
@@ -60,37 +63,37 @@ func (ms *Metrics) StartCollect() {
 func (ms *Metrics) GetRuntimeMetrics() RuntimeMetrics {
 	ms.mx.Lock()
 	defer ms.mx.Unlock()
-	statsUint64 := make(map[string]uint64, uint64StatsLen)
-	statsUint64["Alloc"] = ms.stats.Alloc
-	statsUint64["BuckHashSys"] = ms.stats.BuckHashSys
-	statsUint64["Frees"] = ms.stats.Frees
-	statsUint64["GCSys"] = ms.stats.GCSys
-	statsUint64["HeapAlloc"] = ms.stats.HeapAlloc
-	statsUint64["HeapIdle"] = ms.stats.HeapIdle
-	statsUint64["HeapInuse"] = ms.stats.HeapInuse
-	statsUint64["HeapObjects"] = ms.stats.HeapObjects
-	statsUint64["HeapReleased"] = ms.stats.HeapReleased
-	statsUint64["HeapSys"] = ms.stats.HeapSys
-	statsUint64["Lookups"] = ms.stats.Lookups
-	statsUint64["MCacheInuse"] = ms.stats.MCacheInuse
-	statsUint64["MCacheSys"] = ms.stats.MCacheSys
-	statsUint64["MSpanInuse"] = ms.stats.MSpanInuse
-	statsUint64["MSpanSys"] = ms.stats.MSpanSys
-	statsUint64["NextGC"] = ms.stats.NextGC
-	statsUint64["Mallocs"] = ms.stats.Mallocs
-	statsUint64["OtherSys"] = ms.stats.OtherSys
-	statsUint64["PauseTotalNs"] = ms.stats.PauseTotalNs
-	statsUint64["StackInuse"] = ms.stats.StackInuse
-	statsUint64["StackSys"] = ms.stats.StackSys
-	statsUint64["Sys"] = ms.stats.Sys
-	statsUint64["TotalAlloc"] = ms.stats.TotalAlloc
-	statsUint64["NumForcedGC"] = uint64(ms.stats.NumForcedGC)
-	statsUint64["NumGC"] = uint64(ms.stats.NumGC)
+	memStats := make(map[string]uint64, memStatsLen)
+	memStats["Alloc"] = ms.stats.Alloc
+	memStats["BuckHashSys"] = ms.stats.BuckHashSys
+	memStats["Frees"] = ms.stats.Frees
+	memStats["GCSys"] = ms.stats.GCSys
+	memStats["HeapAlloc"] = ms.stats.HeapAlloc
+	memStats["HeapIdle"] = ms.stats.HeapIdle
+	memStats["HeapInuse"] = ms.stats.HeapInuse
+	memStats["HeapObjects"] = ms.stats.HeapObjects
+	memStats["HeapReleased"] = ms.stats.HeapReleased
+	memStats["HeapSys"] = ms.stats.HeapSys
+	memStats["Lookups"] = ms.stats.Lookups
+	memStats["MCacheInuse"] = ms.stats.MCacheInuse
+	memStats["MCacheSys"] = ms.stats.MCacheSys
+	memStats["MSpanInuse"] = ms.stats.MSpanInuse
+	memStats["MSpanSys"] = ms.stats.MSpanSys
+	memStats["NextGC"] = ms.stats.NextGC
+	memStats["Mallocs"] = ms.stats.Mallocs
+	memStats["OtherSys"] = ms.stats.OtherSys
+	memStats["PauseTotalNs"] = ms.stats.PauseTotalNs
+	memStats["StackInuse"] = ms.stats.StackInuse
+	memStats["StackSys"] = ms.stats.StackSys
+	memStats["Sys"] = ms.stats.Sys
+	memStats["TotalAlloc"] = ms.stats.TotalAlloc
+	memStats["NumForcedGC"] = uint64(ms.stats.NumForcedGC)
+	memStats["NumGC"] = uint64(ms.stats.NumGC)
 
-	statsFloat64 := make(map[string]float64)
-	statsFloat64["GCCPUFraction"] = ms.stats.GCCPUFraction
+	cpuStats := make(map[string]float64, cpuStatsLen)
+	cpuStats["GCCPUFraction"] = ms.stats.GCCPUFraction
 
-	return RuntimeMetrics{memMetrics: statsUint64, cpuMetrics: statsFloat64}
+	return RuntimeMetrics{memMetrics: memStats, cpuMetrics: cpuStats}
 
 }
 
