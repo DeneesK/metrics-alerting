@@ -21,15 +21,12 @@ type Collector interface {
 	GetRuntimeMetrics() metriccollector.RuntimeMetrics
 	GetRandomValue() float64
 	GetPollCount() int64
-	IncrementPollCount()
 }
 
 func sendMetrics(ms Collector) error {
 	runtimeMetrics := ms.GetRuntimeMetrics()
 	cpuMetrics := runtimeMetrics.GetCPUMetrics()
 	memMetrics := runtimeMetrics.GetMemMetrics()
-
-	ms.IncrementPollCount()
 
 	ro := grequests.RequestOptions{Headers: map[string]string{"Content-Type": contentType}}
 	session := grequests.NewSession(&ro)
@@ -45,11 +42,11 @@ func sendMetrics(ms Collector) error {
 			return err
 		}
 	}
-	if err := send(session, gaugeMetric, pollCount, ms.GetRandomValue()); err != nil {
+	if err := send(session, gaugeMetric, randomValue, ms.GetRandomValue()); err != nil {
 		return err
 	}
 
-	if err := send(session, counterMetric, randomValue, ms.GetPollCount()); err != nil {
+	if err := send(session, counterMetric, pollCount, ms.GetPollCount()); err != nil {
 		return err
 	}
 	return nil
