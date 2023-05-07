@@ -79,11 +79,11 @@ func NewMemStorage() MemStorage {
 func (storage *MemStorage) Store(metricType, name, value string) error {
 	switch metricType {
 	case counterMetric:
-		v, err := strconv.Atoi(value)
+		v, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
-			return fmt.Errorf("failed to convert value %s to an int64eger: %w", value, err)
+			return fmt.Errorf("failed to convert value %s to an integer: %w", value, err)
 		}
-		storage.counter.Store(name, int64(v))
+		storage.counter.Store(name, v)
 		return nil
 	case gaugeMetric:
 		v, err := strconv.ParseFloat(value, 64)
@@ -103,7 +103,7 @@ func (storage *MemStorage) GetValue(metricType, name string) (string, bool, erro
 		if !ok {
 			return "", false, nil
 		}
-		return strconv.FormatInt(v, 9), true, nil
+		return strconv.FormatInt(v, 10), true, nil
 	case gaugeMetric:
 		v, ok := storage.gauge.Load(name)
 		if !ok {

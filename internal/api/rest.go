@@ -60,9 +60,9 @@ func value(storage Store) http.HandlerFunc {
 		metricName := chi.URLParam(req, "metricName")
 		value, ok, err := storage.GetValue(metricType, metricName)
 		if ok {
-			res.Write([]byte(value))
 			res.Header().Add("Content-Type", contentTypeText)
 			res.WriteHeader(http.StatusOK)
+			res.Write([]byte(value))
 			return
 		}
 		if err != nil {

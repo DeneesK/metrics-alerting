@@ -9,10 +9,10 @@ import (
 func PrepareURL(basePath string, metricType string, metricName string, value interface{}) (string, error) {
 	switch valueType := value.(type) {
 	case uint64:
-		v := strconv.FormatUint(value.(uint64), 9)
+		v := strconv.FormatUint(value.(uint64), 10)
 		return format(basePath, metricType, metricName, v)
 	case int64:
-		v := strconv.FormatInt(value.(int64), 9)
+		v := strconv.FormatInt(value.(int64), 10)
 		return format(basePath, metricType, metricName, v)
 	case float64:
 		v := strconv.FormatFloat(value.(float64), byte(102), -3, 64)
