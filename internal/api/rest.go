@@ -16,7 +16,7 @@ const (
 type Store interface {
 	Store(typeMetric, name, value string) error
 	GetValue(typeMetric, name string) (string, bool, error)
-	GetCounterMetrics() map[string]int
+	GetCounterMetrics() map[string]int64
 	GetGaugeMetrics() map[string]float64
 }
 

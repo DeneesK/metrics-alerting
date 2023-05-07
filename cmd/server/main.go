@@ -18,6 +18,6 @@ func main() {
 func run() error {
 	metricsStorage := storage.NewMemStorage()
 	r := api.Routers(&metricsStorage)
-	log.Printf("server started at %s", RunAddr)
-	return http.ListenAndServe(RunAddr, r)
+	log.Printf("server started at %s", runAddr)
+	return http.ListenAndServe(runAddr, r)
 }

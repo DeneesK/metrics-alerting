@@ -3,7 +3,6 @@ module github.com/DeneesK/metrics-alerting
 go 1.20
 
 require (
-	github.com/fatih/structs v1.1.0
 	github.com/go-chi/chi v1.5.4
 	github.com/levigross/grequests v0.0.0-20221222020224-9eee758d18d5
 	github.com/stretchr/testify v1.8.2

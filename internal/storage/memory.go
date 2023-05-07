@@ -13,12 +13,10 @@ const (
 )
 
 var ErrMetricType = errors.New("metric type does not exist")
-var ErrCounterValue = errors.New("wrong counter value, must be integer")
-var ErrGaugeValue = errors.New("wrong gauge value, must be float")
 
 type counter struct {
 	mx sync.Mutex
-	c  map[string]int
+	c  map[string]int64
 }
 
 type gauge struct {
@@ -26,20 +24,24 @@ type gauge struct {
 	g  map[string]float64
 }
 
-func (c *counter) Load(key string) (int, bool) {
+func (c *counter) Load(key string) (int64, bool) {
 	c.mx.Lock()
 	defer c.mx.Unlock()
 	val, ok := c.c[key]
 	return val, ok
 }
 
-func (c *counter) LoadAll() map[string]int {
+func (c *counter) LoadAll() map[string]int64 {
 	c.mx.Lock()
 	defer c.mx.Unlock()
-	return c.c
+	cCopy := make(map[string]int64)
+	for k, v := range c.c {
+		cCopy[k] = v
+	}
+	return cCopy
 }
 
-func (c *counter) Store(key string, value int) {
+func (c *counter) Store(key string, value int64) {
 	c.mx.Lock()
 	defer c.mx.Unlock()
 	c.c[key] += value
@@ -55,7 +57,11 @@ func (g *gauge) Load(key string) (float64, bool) {
 func (g *gauge) LoadAll() map[string]float64 {
 	g.mx.Lock()
 	defer g.mx.Unlock()
-	return g.g
+	gCopy := make(map[string]float64)
+	for k, v := range g.g {
+		gCopy[k] = v
+	}
+	return gCopy
 }
 
 func (g *gauge) Store(key string, value float64) {
@@ -70,32 +76,37 @@ type MemStorage struct {
 }
 
 func NewMemStorage() MemStorage {
-	return MemStorage{gauge: gauge{g: make(map[string]float64)}, counter: counter{c: make(map[string]int)}}
+	return MemStorage{gauge: gauge{g: make(map[string]float64)}, counter: counter{c: make(map[string]int64)}}
 }
 
-func (storage *MemStorage) Store(type_, name, value string) error {
-	switch type_ {
+func (storage *MemStorage) Store(metricType, name, value string) error {
+	if ok := checkMetricType(metricType); !ok {
+		return ErrMetricType
+	}
+	switch metricType {
 	case counterMetric:
 		v, err := strconv.Atoi(value)
 		if err != nil {
-			return ErrCounterValue
+			return fmt.Errorf("failed to convert value %s to an int64eger: %w", value, err)
 		}
-		storage.counter.Store(name, v)
+		storage.counter.Store(name, int64(v))
 		return nil
 	case gaugeMetric:
 		v, err := strconv.ParseFloat(value, 64)
 		if err != nil {
-			return ErrGaugeValue
+			return fmt.Errorf("failed to convert value %s to a float: %w", value, err)
 		}
-
 		storage.gauge.Store(name, v)
 		return nil
 	}
 	return ErrMetricType
 }
 
-func (storage *MemStorage) GetValue(typeMetric, name string) (string, bool, error) {
-	switch typeMetric {
+func (storage *MemStorage) GetValue(metricType, name string) (string, bool, error) {
+	if ok := checkMetricType(metricType); !ok {
+		return "", false, ErrMetricType
+	}
+	switch metricType {
 	case counterMetric:
 		v, ok := storage.counter.Load(name)
 		if !ok {
@@ -112,10 +123,14 @@ func (storage *MemStorage) GetValue(typeMetric, name string) (string, bool, erro
 	return "", false, ErrMetricType
 }
 
-func (storage *MemStorage) GetCounterMetrics() map[string]int {
+func (storage *MemStorage) GetCounterMetrics() map[string]int64 {
 	return storage.counter.LoadAll()
 }
 
 func (storage *MemStorage) GetGaugeMetrics() map[string]float64 {
 	return storage.gauge.LoadAll()
+}
+
+func checkMetricType(metricType string) bool {
+	return metricType == counterMetric || metricType == gaugeMetric
 }

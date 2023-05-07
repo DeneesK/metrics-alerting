@@ -2,16 +2,22 @@ package main
 
 import (
 	"log"
+	"time"
 
 	"github.com/DeneesK/metrics-alerting/internal/services/metriccollector"
 )
 
 func main() {
-	parseFlags()
-	ms := metriccollector.NewCollector(PollInterval)
+	if err := parseFlags(); err != nil {
+		log.Fatal(err)
+	}
+	ms := metriccollector.NewCollector(pollingInterval)
 	go ms.StartCollect()
-	log.Printf("client started sending data on %s", RunAddr)
+	log.Printf("client started sending data on %s", runAddr)
 	for {
-		sendMetrics(&ms)
+		if err := sendMetrics(&ms); err != nil {
+			log.Println(err)
+		}
+		time.Sleep(reportInterval)
 	}
 }

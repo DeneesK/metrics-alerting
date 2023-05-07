@@ -45,7 +45,8 @@ func Test_sendReport(t *testing.T) {
 				}
 				w.WriteHeader(http.StatusMethodNotAllowed)
 			}))
-			url, _ := url.JoinPath(ts.URL, test.args.url)
+			url, err := url.JoinPath(ts.URL, test.args.url)
+			assert.NoError(t, err)
 			resp, err := sendReport(session, url)
 			assert.NoError(t, err)
 			assert.Equal(t, resp.StatusCode, test.wantCode)
