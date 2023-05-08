@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/DeneesK/metrics-alerting/internal/services/metriccollector"
 	"github.com/DeneesK/metrics-alerting/internal/services/urlpreparer"
@@ -21,6 +22,7 @@ type Collector interface {
 	GetRuntimeMetrics() metriccollector.RuntimeMetrics
 	GetRandomValue() float64
 	GetPollCount() int64
+	ResetPollCount()
 }
 
 func sendMetrics(ms Collector) error {
@@ -33,36 +35,38 @@ func sendMetrics(ms Collector) error {
 	defer session.CloseIdleConnections()
 
 	for k, v := range cpuMetrics {
-		if err := send(session, gaugeMetric, k, v); err != nil {
+		if _, err := send(session, gaugeMetric, k, v); err != nil {
 			return err
 		}
 	}
 	for k, v := range memMetrics {
-		if err := send(session, gaugeMetric, k, v); err != nil {
+		if _, err := send(session, gaugeMetric, k, v); err != nil {
 			return err
 		}
 	}
-	if err := send(session, gaugeMetric, randomValue, ms.GetRandomValue()); err != nil {
+	if _, err := send(session, gaugeMetric, randomValue, ms.GetRandomValue()); err != nil {
 		return err
 	}
-
-	if err := send(session, counterMetric, pollCount, ms.GetPollCount()); err != nil {
+	statusCode, err := send(session, counterMetric, pollCount, ms.GetPollCount())
+	if err != nil {
 		return err
+	}
+	if statusCode == http.StatusOK {
+		ms.ResetPollCount()
 	}
 	return nil
 }
 
-func send(session *grequests.Session, metricType string, metricName string, value interface{}) error {
+func send(session *grequests.Session, metricType string, metricName string, value interface{}) (int, error) {
 	url, err := urlpreparer.PrepareURL(runAddr, metricType, metricName, value)
 	if err != nil {
-		return fmt.Errorf("unable to send report: %w", err)
-	} else {
-		_, err = postReport(session, url)
-		if err != nil {
-			return fmt.Errorf("unable to send report: %w", err)
-		}
+		return 0, fmt.Errorf("unable to send report: %w", err)
 	}
-	return nil
+	resp, err := postReport(session, url)
+	if err != nil {
+		return 0, fmt.Errorf("unable to send report: %w", err)
+	}
+	return resp.StatusCode, nil
 }
 
 func postReport(s *grequests.Session, url string) (*grequests.Response, error) {

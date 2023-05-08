@@ -50,9 +50,6 @@ func (ms *Metrics) pollMetrics() {
 	defer ms.mx.Unlock()
 	runtime.ReadMemStats(&ms.stats)
 	ms.randomValue = rand.Float64()
-	// Сейчас верное количество поллингов хрантися только на сервере,
-	// агент хранит количесво поллингов сделанных до отправки, после отправки сбрасывает счетчик.
-	// т.к. сервер суммирует метрики типа counter
 	ms.pollCount += 1
 }
 
@@ -110,6 +107,11 @@ func (ms *Metrics) GetPollCount() int64 {
 	ms.mx.Lock()
 	defer ms.mx.Unlock()
 	count := ms.pollCount
-	ms.pollCount = 0
 	return count
+}
+
+func (ms *Metrics) ResetPollCount() {
+	ms.mx.Lock()
+	defer ms.mx.Unlock()
+	ms.pollCount = 0
 }
