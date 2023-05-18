@@ -30,6 +30,14 @@ func Routers(ms Store) chi.Router {
 	return r
 }
 
+func RouterWithoutLogger(ms Store) chi.Router {
+	r := chi.NewRouter()
+	r.Post("/update/{metricType}/{metricName}/{value}", update(ms))
+	r.Get("/value/{metricType}/{metricName}", value(ms))
+	r.Get("/", metrics(ms))
+	return r
+}
+
 func update(storage Store) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		metricType := chi.URLParam(req, "metricType")
