@@ -47,7 +47,7 @@ func Test_update(t *testing.T) {
 		},
 	}
 	ms := storage.NewMemStorage()
-	ts := httptest.NewServer(api.Routers(&ms))
+	ts := httptest.NewServer(api.RouterWithoutLogger(&ms))
 	defer ts.Close()
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
