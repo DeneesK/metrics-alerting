@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/DeneesK/metrics-alerting/internal/api"
+	"github.com/DeneesK/metrics-alerting/internal/logger"
 	"github.com/DeneesK/metrics-alerting/internal/storage"
 )
 
@@ -17,7 +18,11 @@ func main() {
 
 func run() error {
 	metricsStorage := storage.NewMemStorage()
+	log, err := logger.LoggerInitializer(logLevel)
+	if err != nil {
+		return err
+	}
 	r := api.Routers(&metricsStorage)
-	log.Printf("server started at %s", runAddr)
+	log.Infof("server started at %s", runAddr)
 	return http.ListenAndServe(runAddr, r)
 }
