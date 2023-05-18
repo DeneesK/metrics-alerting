@@ -15,7 +15,4 @@ func parseFlags() {
 	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
 		runAddr = envRunAddr
 	}
-	if envRunAddr := os.Getenv("LOG_LEVEL"); envRunAddr != "" {
-		runAddr = envRunAddr
-	}
 }
