@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/DeneesK/metrics-alerting/internal/logger"
 	"github.com/go-chi/chi"
 )
 
@@ -22,6 +23,7 @@ type Store interface {
 
 func Routers(ms Store) chi.Router {
 	r := chi.NewRouter()
+	r.Use(logger.WithLogging)
 	r.Post("/update/{metricType}/{metricName}/{value}", update(ms))
 	r.Get("/value/{metricType}/{metricName}", value(ms))
 	r.Get("/", metrics(ms))
