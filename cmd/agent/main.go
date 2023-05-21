@@ -11,7 +11,6 @@ func main() {
 	if err := parseFlags(); err != nil {
 		log.Fatal(err)
 	}
-
 	reportInterval := time.Duration(reportingInterval) * time.Second
 	ms := metriccollector.NewCollector(pollingInterval)
 	go ms.StartCollect()

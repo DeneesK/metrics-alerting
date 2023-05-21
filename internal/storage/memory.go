@@ -2,7 +2,6 @@ package storage
 
 import (
 	"fmt"
-	"strconv"
 	"sync"
 )
 
@@ -10,6 +9,11 @@ const (
 	counterMetric string = "counter"
 	gaugeMetric   string = "gauge"
 )
+
+type Result struct {
+	Counter int64
+	Gauge   float64
+}
 
 type counter struct {
 	mx sync.Mutex
@@ -76,42 +80,36 @@ func NewMemStorage() MemStorage {
 	return MemStorage{gauge: gauge{g: make(map[string]float64)}, counter: counter{c: make(map[string]int64)}}
 }
 
-func (storage *MemStorage) Store(metricType, name, value string) error {
+func (storage *MemStorage) Store(metricType, name string, value interface{}) error {
 	switch metricType {
 	case counterMetric:
-		v, err := strconv.ParseInt(value, 10, 64)
-		if err != nil {
-			return fmt.Errorf("failed to convert value %s to an integer: %w", value, err)
-		}
+		v := value.(int64)
 		storage.counter.Store(name, v)
 		return nil
 	case gaugeMetric:
-		v, err := strconv.ParseFloat(value, 64)
-		if err != nil {
-			return fmt.Errorf("failed to convert value %s to a float: %w", value, err)
-		}
+		v := value.(float64)
 		storage.gauge.Store(name, v)
 		return nil
 	}
 	return fmt.Errorf("metric type does not exist, given type: %v", metricType)
 }
 
-func (storage *MemStorage) GetValue(metricType, name string) (string, bool, error) {
+func (storage *MemStorage) GetValue(metricType, name string) (Result, bool, error) {
 	switch metricType {
 	case counterMetric:
 		v, ok := storage.counter.Load(name)
 		if !ok {
-			return "", false, nil
+			return Result{0, 0}, false, nil
 		}
-		return strconv.FormatInt(v, 10), true, nil
+		return Result{Counter: v, Gauge: 0}, true, nil
 	case gaugeMetric:
 		v, ok := storage.gauge.Load(name)
 		if !ok {
-			return "", false, nil
+			return Result{0, 0}, false, nil
 		}
-		return strconv.FormatFloat(v, byte(102), -3, 64), true, nil
+		return Result{Counter: 0, Gauge: v}, true, nil
 	}
-	return "", false, fmt.Errorf("metric type does not exist, given type: %v", metricType)
+	return Result{0, 0}, false, fmt.Errorf("metric type does not exist, given type: %v", metricType)
 }
 
 func (storage *MemStorage) GetCounterMetrics() map[string]int64 {

@@ -1,15 +1,20 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/DeneesK/metrics-alerting/internal/api"
+	"github.com/DeneesK/metrics-alerting/internal/models"
 	"github.com/DeneesK/metrics-alerting/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var metric_counter int64 = 1
 
 func Test_update(t *testing.T) {
 	type want struct {
@@ -18,31 +23,15 @@ func Test_update(t *testing.T) {
 	}
 	tests := []struct {
 		name string
-		args string
+		args models.Metrics
 		want want
 	}{
 		{
 			name: "positive test #1",
-			args: "/update/counter/metric/1",
+			args: models.Metrics{ID: "metric", MType: "counter", Delta: &metric_counter},
 			want: want{
 				code:        200,
-				contentType: "text/plain; charset=utf-8",
-			},
-		},
-		{
-			name: "negative test: wrong value #1",
-			args: "/update/counter/metric/b",
-			want: want{
-				code:        400,
-				contentType: "",
-			},
-		},
-		{
-			name: "negative test: missing metric name #2",
-			args: "/update/counter/",
-			want: want{
-				code:        404,
-				contentType: "text/plain; charset=utf-8",
+				contentType: "application/json",
 			},
 		},
 	}
@@ -51,7 +40,10 @@ func Test_update(t *testing.T) {
 	defer ts.Close()
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			request, err := http.NewRequest(http.MethodPost, ts.URL+test.args, nil)
+			res, err := json.Marshal(&test.args)
+			require.NoError(t, err)
+			buf := bytes.NewBuffer(res)
+			request, err := http.NewRequest(http.MethodPost, ts.URL+"/update", buf)
 			require.NoError(t, err)
 			resp, err := ts.Client().Do(request)
 			require.NoError(t, err)
