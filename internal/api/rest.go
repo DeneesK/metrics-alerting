@@ -28,8 +28,8 @@ type Store interface {
 func Routers(ms Store) chi.Router {
 	r := chi.NewRouter()
 	r.Use(logger.WithLogging)
-	r.Post("/update", update_json(ms))
-	r.Get("/value", value_json(ms))
+	r.Post("/update/", update_json(ms))
+	r.Get("/value/", value_json(ms))
 	r.Post("/update/{metricType}/{metricName}/{value}", update(ms))
 	r.Get("/value/{metricType}/{metricName}", value(ms))
 	r.Get("/", metrics(ms))
@@ -40,8 +40,8 @@ func RouterWithoutLogger(ms Store) chi.Router {
 	r := chi.NewRouter()
 	r.Post("/update/{metricType}/{metricName}/{value}", update(ms))
 	r.Get("/value/{metricType}/{metricName}", value(ms))
-	r.Post("/update", update_json(ms))
-	r.Get("/value", value_json(ms))
+	r.Post("/update/", update_json(ms))
+	r.Get("/value/", value_json(ms))
 	r.Get("/", metrics(ms))
 	return r
 }
