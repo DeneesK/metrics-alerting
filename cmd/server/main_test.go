@@ -43,7 +43,7 @@ func Test_update_json(t *testing.T) {
 			res, err := json.Marshal(&test.args)
 			require.NoError(t, err)
 			buf := bytes.NewBuffer(res)
-			request, err := http.NewRequest(http.MethodPost, ts.URL+"/update", buf)
+			request, err := http.NewRequest(http.MethodPost, ts.URL+"/update/", buf)
 			require.NoError(t, err)
 			resp, err := ts.Client().Do(request)
 			require.NoError(t, err)
