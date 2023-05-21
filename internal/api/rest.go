@@ -29,7 +29,7 @@ func Routers(ms Store) chi.Router {
 	r := chi.NewRouter()
 	r.Use(logger.WithLogging)
 	r.Post("/update/", updateJSON(ms))
-	r.Post("/value/", valueJson(ms))
+	r.Post("/value/", valueJSON(ms))
 	r.Post("/update/{metricType}/{metricName}/{value}", update(ms))
 	r.Get("/value/{metricType}/{metricName}", value(ms))
 	r.Get("/", metrics(ms))
@@ -41,7 +41,7 @@ func RouterWithoutLogger(ms Store) chi.Router {
 	r.Post("/update/{metricType}/{metricName}/{value}", update(ms))
 	r.Get("/value/{metricType}/{metricName}", value(ms))
 	r.Post("/update/", updateJSON(ms))
-	r.Post("/value/", valueJson(ms))
+	r.Post("/value/", valueJSON(ms))
 	r.Get("/", metrics(ms))
 	return r
 }
@@ -90,19 +90,36 @@ func updateJSON(storage Store) http.HandlerFunc {
 	}
 }
 
-func valueJson(storage Store) http.HandlerFunc {
+func valueJSON(storage Store) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		metricType := chi.URLParam(req, "metricType")
-		metricName := chi.URLParam(req, "metricName")
-		value, ok, err := storage.GetValue(metricType, metricName)
+		var metric models.Metrics
+		if err := json.NewDecoder(req.Body).Decode(&metric); err != nil {
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		value, ok, err := storage.GetValue(metric.MType, metric.ID)
 		if ok {
 			res.Header().Add("Content-Type", contentType)
 			res.WriteHeader(http.StatusOK)
-			switch metricType {
+			switch metric.MType {
 			case "counter":
-				res.Write([]byte(strconv.FormatInt(value.Counter, 10)))
+				metric.Delta = &value.Counter
+				resp, err := json.Marshal(&metric)
+				if err != nil {
+					res.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				res.Header().Add("Content-Type", contentType)
+				res.Write(resp)
 			case "gauge":
-				res.Write([]byte(strconv.FormatFloat(value.Gauge, byte(102), -3, 64)))
+				metric.Value = &value.Gauge
+				resp, err := json.Marshal(&metric)
+				if err != nil {
+					res.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				res.Header().Add("Content-Type", contentType)
+				res.Write(resp)
 			}
 			return
 		}
