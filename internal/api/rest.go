@@ -61,7 +61,6 @@ func updateJSON(storage Store) http.HandlerFunc {
 				res.WriteHeader(http.StatusBadRequest)
 				return
 			}
-			res.WriteHeader(http.StatusOK)
 			res.Header().Add("Content-Type", contentType)
 			res.Write(resp)
 		case "counter":
@@ -74,7 +73,6 @@ func updateJSON(storage Store) http.HandlerFunc {
 					res.WriteHeader(http.StatusBadRequest)
 					return
 				}
-				res.WriteHeader(http.StatusOK)
 				res.Header().Add("Content-Type", contentType)
 				res.Write(resp)
 			}
@@ -86,18 +84,19 @@ func updateJSON(storage Store) http.HandlerFunc {
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
-
+		res.WriteHeader(http.StatusOK)
 	}
 }
 
 func valueJSON(storage Store) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		var metric models.Metrics
+		fmt.Println(metric.MType)
+		fmt.Println(metric.ID)
 		if err := json.NewDecoder(req.Body).Decode(&metric); err != nil {
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		fmt.Println(metric.ID)
 		value, ok, err := storage.GetValue(metric.MType, metric.ID)
 		if ok {
 			res.Header().Add("Content-Type", contentType)
