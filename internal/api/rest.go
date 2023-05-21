@@ -28,8 +28,8 @@ type Store interface {
 func Routers(ms Store) chi.Router {
 	r := chi.NewRouter()
 	r.Use(logger.WithLogging)
-	r.Post("/update/", update_json(ms))
-	r.Get("/value/", value_json(ms))
+	r.Post("/update", updateJson(ms))
+	r.Get("/value", valueJson(ms))
 	r.Post("/update/{metricType}/{metricName}/{value}", update(ms))
 	r.Get("/value/{metricType}/{metricName}", value(ms))
 	r.Get("/", metrics(ms))
@@ -40,13 +40,13 @@ func RouterWithoutLogger(ms Store) chi.Router {
 	r := chi.NewRouter()
 	r.Post("/update/{metricType}/{metricName}/{value}", update(ms))
 	r.Get("/value/{metricType}/{metricName}", value(ms))
-	r.Post("/update/", update_json(ms))
-	r.Get("/value/", value_json(ms))
+	r.Post("/update", updateJson(ms))
+	r.Get("/value", valueJson(ms))
 	r.Get("/", metrics(ms))
 	return r
 }
 
-func update_json(storage Store) http.HandlerFunc {
+func updateJson(storage Store) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		var metric models.Metrics
 		if err := json.NewDecoder(req.Body).Decode(&metric); err != nil {
@@ -90,7 +90,7 @@ func update_json(storage Store) http.HandlerFunc {
 	}
 }
 
-func value_json(storage Store) http.HandlerFunc {
+func valueJson(storage Store) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		metricType := chi.URLParam(req, "metricType")
 		metricName := chi.URLParam(req, "metricName")

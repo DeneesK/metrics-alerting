@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var metric_counter int64 = 1
+var metricCounter int64 = 1
 
 func Test_update_json(t *testing.T) {
 	type want struct {
@@ -28,7 +28,7 @@ func Test_update_json(t *testing.T) {
 	}{
 		{
 			name: "positive test #1",
-			args: models.Metrics{ID: "metric", MType: "counter", Delta: &metric_counter},
+			args: models.Metrics{ID: "metric", MType: "counter", Delta: &metricCounter},
 			want: want{
 				code:        200,
 				contentType: "application/json",
