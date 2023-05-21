@@ -30,7 +30,7 @@ type Collector interface {
 }
 
 func sendMetrics(ms Collector) error {
-	url, err := url.JoinPath("http://", runAddr, "update/")
+	url, err := url.JoinPath("http://", runAddr, "update", "/")
 	if err != nil {
 		return err
 	}
