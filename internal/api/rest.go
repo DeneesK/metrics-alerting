@@ -14,7 +14,8 @@ import (
 )
 
 const (
-	contentType = "application/json"
+	contentType     = "application/json"
+	contentTypeText = "text/plain"
 )
 
 type Store interface {
@@ -27,21 +28,25 @@ type Store interface {
 func Routers(ms Store) chi.Router {
 	r := chi.NewRouter()
 	r.Use(logger.WithLogging)
-	r.Post("/update", update(ms))
-	r.Get("/value", value(ms))
+	r.Post("/update", update_json(ms))
+	r.Get("/value", value_json(ms))
+	r.Post("/update/{metricType}/{metricName}/{value}", update(ms))
+	r.Get("/value/{metricType}/{metricName}", value(ms))
 	r.Get("/", metrics(ms))
 	return r
 }
 
 func RouterWithoutLogger(ms Store) chi.Router {
 	r := chi.NewRouter()
-	r.Post("/update", update(ms))
-	r.Get("/value", value(ms))
+	r.Post("/update/{metricType}/{metricName}/{value}", update(ms))
+	r.Get("/value/{metricType}/{metricName}", value(ms))
+	r.Post("/update", update_json(ms))
+	r.Get("/value", value_json(ms))
 	r.Get("/", metrics(ms))
 	return r
 }
 
-func update(storage Store) http.HandlerFunc {
+func update_json(storage Store) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		var metric models.Metrics
 		if err := json.NewDecoder(req.Body).Decode(&metric); err != nil {
@@ -85,7 +90,7 @@ func update(storage Store) http.HandlerFunc {
 	}
 }
 
-func value(storage Store) http.HandlerFunc {
+func value_json(storage Store) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		metricType := chi.URLParam(req, "metricType")
 		metricName := chi.URLParam(req, "metricName")
@@ -103,6 +108,59 @@ func value(storage Store) http.HandlerFunc {
 		}
 		if err != nil {
 			log.Println(err)
+		}
+		res.WriteHeader(http.StatusNotFound)
+	}
+}
+
+func update(storage Store) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		metricType := chi.URLParam(req, "metricType")
+		metricName := chi.URLParam(req, "metricName")
+		valueString := chi.URLParam(req, "value")
+		switch metricType {
+		case "gauge":
+			v, err := strconv.ParseFloat(valueString, 64)
+			if err != nil {
+				res.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			storage.Store(metricType, metricName, v)
+		case "counter":
+			v, err := strconv.ParseInt(valueString, 10, 64)
+			if err != nil {
+				res.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			storage.Store(metricType, metricName, v)
+		default:
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		res.Header().Add("Content-Type", contentTypeText)
+		res.WriteHeader(http.StatusOK)
+	}
+}
+
+func value(storage Store) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		metricType := chi.URLParam(req, "metricType")
+		metricName := chi.URLParam(req, "metricName")
+		value, ok, err := storage.GetValue(metricType, metricName)
+		if ok {
+			res.Header().Add("Content-Type", contentTypeText)
+			res.WriteHeader(http.StatusOK)
+			switch metricType {
+			case "counter":
+				res.Write([]byte(strconv.FormatInt(value.Counter, 10)))
+			case "gauge":
+				res.Write([]byte(strconv.FormatFloat(value.Gauge, byte(102), -3, 64)))
+			}
+			return
+		}
+		if err != nil {
+			log.Panicln(err)
 		}
 		res.WriteHeader(http.StatusNotFound)
 	}
