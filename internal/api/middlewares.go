@@ -69,7 +69,7 @@ func (c *compressReader) Close() error {
 func gzipMiddleware(next http.Handler) http.Handler {
 	gzipFn := func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.Header.Get("Content-Type"), "application/json") ||
-			strings.Contains(r.Header.Get("Content-Type"), "text/html") {
+			strings.Contains(r.Header.Get("Content-Type"), "html/text") {
 			ow := w
 			acceptEncoding := r.Header.Get("Accept-Encoding")
 			supportsGzip := strings.Contains(acceptEncoding, "gzip")
