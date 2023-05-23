@@ -28,6 +28,7 @@ type Store interface {
 func Routers(ms Store) chi.Router {
 	r := chi.NewRouter()
 	r.Use(logger.WithLogging)
+	r.Use(gzipMiddleware)
 	r.Post("/update/", updateJSON(ms))
 	r.Post("/value/", valueJSON(ms))
 	r.Post("/update/{metricType}/{metricName}/{value}", update(ms))
@@ -36,7 +37,7 @@ func Routers(ms Store) chi.Router {
 	return r
 }
 
-func RouterWithoutLogger(ms Store) chi.Router {
+func RouterWithoutMiddlewares(ms Store) chi.Router {
 	r := chi.NewRouter()
 	r.Post("/update/{metricType}/{metricName}/{value}", update(ms))
 	r.Get("/value/{metricType}/{metricName}", value(ms))
@@ -62,6 +63,7 @@ func updateJSON(storage Store) http.HandlerFunc {
 				return
 			}
 			res.Header().Add("Content-Type", contentType)
+			res.WriteHeader(http.StatusOK)
 			res.Write(resp)
 		case "counter":
 			storage.Store(metric.MType, metric.ID, *metric.Delta)
@@ -74,6 +76,7 @@ func updateJSON(storage Store) http.HandlerFunc {
 					return
 				}
 				res.Header().Add("Content-Type", contentType)
+				res.WriteHeader(http.StatusOK)
 				res.Write(resp)
 			}
 			if err != nil {
@@ -84,23 +87,18 @@ func updateJSON(storage Store) http.HandlerFunc {
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		res.WriteHeader(http.StatusOK)
 	}
 }
 
 func valueJSON(storage Store) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		var metric models.Metrics
-		fmt.Println(metric.MType)
-		fmt.Println(metric.ID)
 		if err := json.NewDecoder(req.Body).Decode(&metric); err != nil {
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
 		value, ok, err := storage.GetValue(metric.MType, metric.ID)
 		if ok {
-			res.Header().Add("Content-Type", contentType)
-			res.WriteHeader(http.StatusOK)
 			switch metric.MType {
 			case "counter":
 				metric.Delta = &value.Counter
@@ -110,6 +108,7 @@ func valueJSON(storage Store) http.HandlerFunc {
 					return
 				}
 				res.Header().Add("Content-Type", contentType)
+				res.WriteHeader(http.StatusOK)
 				res.Write(resp)
 			case "gauge":
 				metric.Value = &value.Gauge
@@ -119,6 +118,7 @@ func valueJSON(storage Store) http.HandlerFunc {
 					return
 				}
 				res.Header().Add("Content-Type", contentType)
+				res.WriteHeader(http.StatusOK)
 				res.Write(resp)
 			}
 			return

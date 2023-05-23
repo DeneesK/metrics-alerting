@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -17,6 +19,7 @@ var (
 	contentType   string  = "application/json"
 	pollCount     string  = "PollCount"
 	randomValue   string  = "RandomValue"
+	encodeType    string  = "gzip"
 	cvalue        int64   = 0
 	gvalue        float64 = 0
 )
@@ -38,7 +41,7 @@ func sendMetrics(ms Collector) error {
 	cpuMetrics := runtimeMetrics.GetCPUMetrics()
 	memMetrics := runtimeMetrics.GetMemMetrics()
 
-	ro := grequests.RequestOptions{Headers: map[string]string{"Content-Type": contentType}}
+	ro := grequests.RequestOptions{Headers: map[string]string{"Content-Encoding": encodeType, "Content-Type": contentType}}
 	session := grequests.NewSession(&ro)
 	defer session.CloseIdleConnections()
 
@@ -97,11 +100,29 @@ func send(session *grequests.Session, url string, metricType string, metricName 
 	}
 	res, err := json.Marshal(&m)
 	if err != nil {
-		return http.StatusInternalServerError, err
+		return 0, err
 	}
-	resp, err := session.Post(url, &grequests.RequestOptions{JSON: res})
+	r, err := compress(res)
+	if err != nil {
+		return 0, err
+	}
+	resp, err := session.Post(url, &grequests.RequestOptions{JSON: r})
 	if err != nil {
 		return 0, fmt.Errorf("unable to send report: %w", err)
 	}
 	return resp.StatusCode, nil
+}
+
+func compress(b []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	gz, err := gzip.NewWriterLevel(&buf, gzip.BestSpeed)
+	if err != nil {
+		return nil, err
+	}
+	_, err = gz.Write(b)
+	if err != nil {
+		return nil, err
+	}
+	gz.Close()
+	return buf.Bytes(), nil
 }

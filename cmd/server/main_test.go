@@ -36,7 +36,7 @@ func Test_update_json(t *testing.T) {
 		},
 	}
 	ms := storage.NewMemStorage()
-	ts := httptest.NewServer(api.RouterWithoutLogger(&ms))
+	ts := httptest.NewServer(api.RouterWithoutMiddlewares(&ms))
 	defer ts.Close()
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -91,7 +91,7 @@ func Test_update(t *testing.T) {
 		},
 	}
 	ms := storage.NewMemStorage()
-	ts := httptest.NewServer(api.RouterWithoutLogger(&ms))
+	ts := httptest.NewServer(api.RouterWithoutMiddlewares(&ms))
 	defer ts.Close()
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
