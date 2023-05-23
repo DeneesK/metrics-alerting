@@ -195,7 +195,7 @@ func metrics(storage Store) http.HandlerFunc {
 			r += fmt.Sprintf("[%s]: %g\n", k, v)
 		}
 		res.Header().Add("Content-Type", "text/html")
-		res.Write([]byte(r))
 		res.WriteHeader(http.StatusOK)
+		res.Write([]byte(r))
 	}
 }
