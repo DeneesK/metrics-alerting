@@ -18,7 +18,7 @@ func parseFlags() error {
 	flag.StringVar(&logLevel, "l", "info", "log level")
 	flag.StringVar(&filePath, "f", "tmp/metrics-db.json", "path to store file")
 	flag.StringVar(&isRestore, "r", "true", "load saved data")
-	flag.IntVar(&storeInterval, "i", 10, "interval of storing data on disk")
+	flag.IntVar(&storeInterval, "i", 300, "interval of storing data on disk")
 	flag.Parse()
 	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
 		runAddr = envRunAddr

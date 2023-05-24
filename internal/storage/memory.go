@@ -133,11 +133,6 @@ func (storage *MemStorage) GetGaugeMetrics() map[string]float64 {
 	return storage.gauge.LoadAll()
 }
 
-func (storage *MemStorage) setMetrics(metrics *allMetrics) {
-	storage.counter.Set(metrics.Counter)
-	storage.gauge.Set(metrics.Gauge)
-}
-
 func (storage *MemStorage) SaveToFile(path string) error {
 	return storeToFile(path, storage)
 }
@@ -147,4 +142,9 @@ func (storage *MemStorage) LoadFromFile(path string) error {
 		return err
 	}
 	return loadFromFile(path, storage)
+}
+
+func (storage *MemStorage) setMetrics(metrics *allMetrics) {
+	storage.counter.Set(metrics.Counter)
+	storage.gauge.Set(metrics.Gauge)
 }
