@@ -27,7 +27,7 @@ func parseFlags() error {
 		}
 		reportingInterval = fri
 	}
-	if envpollInterval, ok := os.LookupEnv("POLL_INTERVAL "); ok {
+	if envpollInterval, ok := os.LookupEnv("POLL_INTERVAL"); ok {
 		fpi, err := strconv.Atoi(envpollInterval)
 		if err != nil {
 			err = fmt.Errorf("value of POLL_INTERVAL is not a integer: %w", err)

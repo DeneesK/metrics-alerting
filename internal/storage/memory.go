@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"os"
 	"sync"
 )
 
@@ -32,6 +33,12 @@ func (c *counter) Load(key string) (int64, bool) {
 	return val, ok
 }
 
+func (c *counter) Set(m map[string]int64) {
+	c.mx.Lock()
+	defer c.mx.Unlock()
+	c.c = m
+}
+
 func (c *counter) LoadAll() map[string]int64 {
 	c.mx.Lock()
 	defer c.mx.Unlock()
@@ -53,6 +60,12 @@ func (g *gauge) Load(key string) (float64, bool) {
 	defer g.mx.Unlock()
 	val, ok := g.g[key]
 	return val, ok
+}
+
+func (g *gauge) Set(m map[string]float64) {
+	g.mx.Lock()
+	defer g.mx.Unlock()
+	g.g = m
 }
 
 func (g *gauge) LoadAll() map[string]float64 {
@@ -118,4 +131,20 @@ func (storage *MemStorage) GetCounterMetrics() map[string]int64 {
 
 func (storage *MemStorage) GetGaugeMetrics() map[string]float64 {
 	return storage.gauge.LoadAll()
+}
+
+func (storage *MemStorage) setMetrics(metrics *allMetrics) {
+	storage.counter.Set(metrics.Counter)
+	storage.gauge.Set(metrics.Gauge)
+}
+
+func (storage *MemStorage) SaveToFile(path string) error {
+	return storeToFile(path, storage)
+}
+
+func (storage *MemStorage) LoadFromFile(path string) error {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return err
+	}
+	return loadFromFile(path, storage)
 }
