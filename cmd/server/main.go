@@ -37,7 +37,7 @@ func run() error {
 	}
 	if ok {
 		if err := metricsStorage.LoadFromFile(filePath); err != nil {
-			log.Infof("during attempt to load from file, error occurred: %v", err)
+			log.Errorf("during attempt to load from file, error occurred: %v", err)
 		}
 	}
 	if filePath != "" {
