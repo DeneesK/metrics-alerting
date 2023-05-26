@@ -8,13 +8,25 @@ import (
 	"testing"
 
 	"github.com/DeneesK/metrics-alerting/internal/api"
+	"github.com/DeneesK/metrics-alerting/internal/logger"
 	"github.com/DeneesK/metrics-alerting/internal/models"
 	"github.com/DeneesK/metrics-alerting/internal/storage"
+	"github.com/go-chi/chi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var metricCounter int64 = 1
+
+func RouterWithoutMiddlewares(ms *storage.MemStorage) chi.Router {
+	r := chi.NewRouter()
+	r.Post("/update/{metricType}/{metricName}/{value}", api.Update(ms))
+	r.Get("/value/{metricType}/{metricName}", api.Value(ms))
+	r.Post("/update/", api.UpdateJSON(ms))
+	r.Post("/value/", api.ValueJSON(ms))
+	r.Get("/", api.Metrics(ms))
+	return r
+}
 
 func Test_update_json(t *testing.T) {
 	type want struct {
@@ -35,8 +47,12 @@ func Test_update_json(t *testing.T) {
 			},
 		},
 	}
-	ms := storage.NewMemStorage()
-	ts := httptest.NewServer(api.RouterWithoutMiddlewares(&ms))
+	log, err := logger.LoggerInitializer("info")
+	if err != nil {
+		log.Fatal(err)
+	}
+	ms := storage.NewMemStorage("", 0, false, log)
+	ts := httptest.NewServer(RouterWithoutMiddlewares(ms))
 	defer ts.Close()
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -90,8 +106,12 @@ func Test_update(t *testing.T) {
 			},
 		},
 	}
-	ms := storage.NewMemStorage()
-	ts := httptest.NewServer(api.RouterWithoutMiddlewares(&ms))
+	log, err := logger.LoggerInitializer("info")
+	if err != nil {
+		log.Fatal(err)
+	}
+	ms := storage.NewMemStorage("", 0, false, log)
+	ts := httptest.NewServer(RouterWithoutMiddlewares(ms))
 	defer ts.Close()
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

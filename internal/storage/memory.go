@@ -3,13 +3,23 @@ package storage
 import (
 	"fmt"
 	"os"
+	"path"
 	"sync"
+	"time"
 )
 
 const (
 	counterMetric string = "counter"
 	gaugeMetric   string = "gauge"
 )
+
+type storageLogger interface {
+	Fatal(args ...interface{})
+	Error(args ...interface{})
+	Errorf(template string, args ...interface{})
+	Info(args ...interface{})
+	Infof(template string, args ...interface{})
+}
 
 type Result struct {
 	Counter int64
@@ -33,7 +43,7 @@ func (c *counter) Load(key string) (int64, bool) {
 	return val, ok
 }
 
-func (c *counter) Set(m map[string]int64) {
+func (c *counter) set(m map[string]int64) {
 	c.mx.Lock()
 	defer c.mx.Unlock()
 	c.c = m
@@ -62,7 +72,7 @@ func (g *gauge) Load(key string) (float64, bool) {
 	return val, ok
 }
 
-func (g *gauge) Set(m map[string]float64) {
+func (g *gauge) set(m map[string]float64) {
 	g.mx.Lock()
 	defer g.mx.Unlock()
 	g.g = m
@@ -85,12 +95,35 @@ func (g *gauge) Store(key string, value float64) {
 }
 
 type MemStorage struct {
-	gauge   gauge
-	counter counter
+	gauge         gauge
+	counter       counter
+	filePath      string
+	storeInterval time.Duration
+	log           storageLogger
 }
 
-func NewMemStorage() MemStorage {
-	return MemStorage{gauge: gauge{g: make(map[string]float64)}, counter: counter{c: make(map[string]int64)}}
+func NewMemStorage(filePath string, storeInterval int, isRestore bool, log storageLogger) *MemStorage {
+	ms := MemStorage{
+		gauge:         gauge{g: make(map[string]float64)},
+		counter:       counter{c: make(map[string]int64)},
+		filePath:      filePath,
+		storeInterval: time.Duration(storeInterval) * time.Second,
+		log:           log,
+	}
+
+	if isRestore {
+		if err := ms.loadFromFile(filePath); err != nil {
+			ms.log.Errorf("during attempt to load from file, error occurred: %v", err)
+		}
+	}
+
+	if filePath != "" && storeInterval != 0 {
+		if err := ms.startStoring(); err != nil {
+			ms.log.Errorf("during initializing of new storage, error occurred: %v", err)
+		}
+	}
+
+	return &ms
 }
 
 func (storage *MemStorage) Store(metricType, name string, value interface{}) error {
@@ -133,18 +166,36 @@ func (storage *MemStorage) GetGaugeMetrics() map[string]float64 {
 	return storage.gauge.LoadAll()
 }
 
-func (storage *MemStorage) SaveToFile(path string) error {
+func (storage *MemStorage) saveToFile(path string) error {
 	return storeToFile(path, storage)
 }
 
-func (storage *MemStorage) LoadFromFile(path string) error {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return err
-	}
+func (storage *MemStorage) loadFromFile(path string) error {
 	return loadFromFile(path, storage)
 }
 
 func (storage *MemStorage) setMetrics(metrics *allMetrics) {
-	storage.counter.Set(metrics.Counter)
-	storage.gauge.Set(metrics.Gauge)
+	storage.counter.set(metrics.Counter)
+	storage.gauge.set(metrics.Gauge)
+}
+
+func (storage *MemStorage) startStoring() error {
+	dir, _ := path.Split(storage.filePath)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		err := os.Mkdir(dir, 0666)
+		if err != nil {
+			return err
+		}
+	}
+	go storage.save()
+	return nil
+}
+
+func (storage *MemStorage) save() {
+	for {
+		time.Sleep(storage.storeInterval)
+		if err := storage.saveToFile(storage.filePath); err != nil {
+			storage.log.Errorf("during attempt to store data to file, error occurred: %v", err)
+		}
+	}
 }

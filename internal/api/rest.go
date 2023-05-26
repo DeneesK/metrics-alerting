@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 
@@ -25,29 +24,30 @@ type Store interface {
 	GetGaugeMetrics() map[string]float64
 }
 
-func Routers(ms Store) chi.Router {
+type apiLogger interface {
+	Fatal(args ...interface{})
+	Error(args ...interface{})
+	Errorf(template string, args ...interface{})
+	Info(args ...interface{})
+	Infof(template string, args ...interface{})
+}
+
+var log apiLogger
+
+func Routers(ms Store, logg apiLogger) chi.Router {
+	log = logg
 	r := chi.NewRouter()
 	r.Use(logger.WithLogging)
 	r.Use(gzipMiddleware)
-	r.Post("/update/", updateJSON(ms))
-	r.Post("/value/", valueJSON(ms))
-	r.Post("/update/{metricType}/{metricName}/{value}", update(ms))
-	r.Get("/value/{metricType}/{metricName}", value(ms))
-	r.Get("/", metrics(ms))
+	r.Post("/update/", UpdateJSON(ms))
+	r.Post("/value/", ValueJSON(ms))
+	r.Post("/update/{metricType}/{metricName}/{value}", Update(ms))
+	r.Get("/value/{metricType}/{metricName}", Value(ms))
+	r.Get("/", Metrics(ms))
 	return r
 }
 
-func RouterWithoutMiddlewares(ms Store) chi.Router {
-	r := chi.NewRouter()
-	r.Post("/update/{metricType}/{metricName}/{value}", update(ms))
-	r.Get("/value/{metricType}/{metricName}", value(ms))
-	r.Post("/update/", updateJSON(ms))
-	r.Post("/value/", valueJSON(ms))
-	r.Get("/", metrics(ms))
-	return r
-}
-
-func updateJSON(storage Store) http.HandlerFunc {
+func UpdateJSON(storage Store) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		var metric models.Metrics
 		if err := json.NewDecoder(req.Body).Decode(&metric); err != nil {
@@ -90,7 +90,7 @@ func updateJSON(storage Store) http.HandlerFunc {
 	}
 }
 
-func valueJSON(storage Store) http.HandlerFunc {
+func ValueJSON(storage Store) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		var metric models.Metrics
 		if err := json.NewDecoder(req.Body).Decode(&metric); err != nil {
@@ -98,7 +98,9 @@ func valueJSON(storage Store) http.HandlerFunc {
 			return
 		}
 		value, ok, err := storage.GetValue(metric.MType, metric.ID)
-		if ok {
+		if err != nil {
+			log.Error(err)
+		} else if ok {
 			switch metric.MType {
 			case "counter":
 				metric.Delta = &value.Counter
@@ -123,14 +125,11 @@ func valueJSON(storage Store) http.HandlerFunc {
 			}
 			return
 		}
-		if err != nil {
-			log.Println(err)
-		}
 		res.WriteHeader(http.StatusNotFound)
 	}
 }
 
-func update(storage Store) http.HandlerFunc {
+func Update(storage Store) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		metricType := chi.URLParam(req, "metricType")
 		metricName := chi.URLParam(req, "metricName")
@@ -160,7 +159,7 @@ func update(storage Store) http.HandlerFunc {
 	}
 }
 
-func value(storage Store) http.HandlerFunc {
+func Value(storage Store) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		metricType := chi.URLParam(req, "metricType")
 		metricName := chi.URLParam(req, "metricName")
@@ -172,18 +171,18 @@ func value(storage Store) http.HandlerFunc {
 			case "counter":
 				res.Write([]byte(strconv.FormatInt(value.Counter, 10)))
 			case "gauge":
-				res.Write([]byte(strconv.FormatFloat(value.Gauge, byte(102), -3, 64)))
+				res.Write([]byte(strconv.FormatFloat(value.Gauge, byte(102), -1, 64)))
 			}
 			return
 		}
 		if err != nil {
-			log.Panicln(err)
+			log.Error(err)
 		}
 		res.WriteHeader(http.StatusNotFound)
 	}
 }
 
-func metrics(storage Store) http.HandlerFunc {
+func Metrics(storage Store) http.HandlerFunc {
 	return func(res http.ResponseWriter, _ *http.Request) {
 		c := storage.GetCounterMetrics()
 		g := storage.GetGaugeMetrics()

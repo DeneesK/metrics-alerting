@@ -1,13 +1,14 @@
 package logger
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
 	"go.uber.org/zap"
 )
 
-var sugar zap.SugaredLogger
+var Sugar zap.SugaredLogger
 var cfg zap.Config
 
 type responseData struct {
@@ -34,7 +35,7 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 func LoggerInitializer(level string) (*zap.SugaredLogger, error) {
 	logger, err := zap.NewDevelopment()
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("during logger initialize error ocurred - %v", err)
 	}
 	defer logger.Sync()
 
@@ -44,14 +45,12 @@ func LoggerInitializer(level string) (*zap.SugaredLogger, error) {
 		return nil, err
 	}
 	cfg.Level = lvl
-	sugar = *logger.Sugar()
-	return &sugar, nil
+	Sugar = *logger.Sugar()
+	return &Sugar, nil
 }
 
 func WithLogging(h http.Handler) http.Handler {
-	logFn := func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		responseData := &responseData{
 			status: 0,
 			size:   0,
@@ -60,17 +59,15 @@ func WithLogging(h http.Handler) http.Handler {
 			ResponseWriter: w,
 			responseData:   responseData,
 		}
+		start := time.Now()
 		h.ServeHTTP(&lw, r)
-
 		duration := time.Since(start)
-
-		sugar.Infoln(
+		Sugar.Infoln(
 			"uri", r.RequestURI,
 			"method", r.Method,
 			"status", responseData.status,
 			"duration", duration,
 			"size", responseData.size,
 		)
-	}
-	return http.HandlerFunc(logFn)
+	})
 }

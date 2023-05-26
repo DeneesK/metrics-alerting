@@ -13,15 +13,18 @@ import (
 	"github.com/levigross/grequests"
 )
 
+const (
+	counterMetric string = "counter"
+	gaugeMetric   string = "gauge"
+	contentType   string = "application/json"
+	pollCount     string = "PollCount"
+	randomValue   string = "RandomValue"
+	encodeType    string = "gzip"
+)
+
 var (
-	counterMetric string  = "counter"
-	gaugeMetric   string  = "gauge"
-	contentType   string  = "application/json"
-	pollCount     string  = "PollCount"
-	randomValue   string  = "RandomValue"
-	encodeType    string  = "gzip"
-	cvalue        int64   = 0
-	gvalue        float64 = 0
+	cvalue int64   = 0
+	gvalue float64 = 0
 )
 
 type Collector interface {
@@ -32,7 +35,7 @@ type Collector interface {
 	ResetPollCount()
 }
 
-func sendMetrics(ms Collector) error {
+func sendMetrics(ms Collector, runAddr string) error {
 	url, err := url.JoinPath("http://", runAddr, "update", "/")
 	if err != nil {
 		return err
@@ -41,7 +44,11 @@ func sendMetrics(ms Collector) error {
 	cpuMetrics := runtimeMetrics.GetCPUMetrics()
 	memMetrics := runtimeMetrics.GetMemMetrics()
 
-	ro := grequests.RequestOptions{Headers: map[string]string{"Content-Encoding": encodeType, "Content-Type": contentType}}
+	ro := grequests.RequestOptions{Headers: map[string]string{
+		"Accept-Encoding":  encodeType,
+		"Content-Encoding": encodeType,
+		"Content-Type":     contentType},
+	}
 	session := grequests.NewSession(&ro)
 	defer session.CloseIdleConnections()
 
@@ -70,33 +77,29 @@ func sendMetrics(ms Collector) error {
 
 func send(session *grequests.Session, url string, metricType string, metricName string, value interface{}) (int, error) {
 	m := models.Metrics{Delta: &cvalue, Value: &gvalue}
+	m.ID = metricName // перенеси сразу в структуру
+	m.MType = metricType
 	switch metricType {
 	case "counter":
 		switch t := value.(type) {
 		case uint64:
-			m.ID = metricName
-			m.MType = metricType
 			*m.Delta = int64(value.(uint64))
 		case int64:
-			m.ID = metricName
-			m.MType = metricType
 			*m.Delta = value.(int64)
 		default:
-			return 0, fmt.Errorf("unable to send report, value must be uint64, int64 or float64, have - %v", t)
+			return 0, fmt.Errorf("unable to send report, counter value must be uint64 or int64, have - %v", t)
 		}
 	case "gauge":
 		switch t := value.(type) {
 		case uint64:
-			m.ID = metricName
-			m.MType = metricType
 			*m.Value = float64(value.(uint64))
 		case float64:
-			m.ID = metricName
-			m.MType = metricType
 			*m.Value = value.(float64)
 		default:
-			return 0, fmt.Errorf("unable to send report, value must be uint64 or float64, have - %v", t)
+			return 0, fmt.Errorf("unable to send report, gauge value must be uint64 or float64, have - %v", t)
 		}
+	default:
+		return 0, fmt.Errorf("unable to send report, metricType must be counter or gauge, have - %v", metricType)
 	}
 	res, err := json.Marshal(&m)
 	if err != nil {
@@ -110,6 +113,7 @@ func send(session *grequests.Session, url string, metricType string, metricName 
 	if err != nil {
 		return 0, fmt.Errorf("unable to send report: %w", err)
 	}
+	defer resp.Close()
 	return resp.StatusCode, nil
 }
 
