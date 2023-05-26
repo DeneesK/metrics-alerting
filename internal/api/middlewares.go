@@ -5,8 +5,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-
-	"github.com/DeneesK/metrics-alerting/internal/logger"
 )
 
 type compressWriter struct {
@@ -83,7 +81,7 @@ func gzipMiddleware(next http.Handler) http.Handler {
 		if sendsGzip {
 			cr, err := newCompressReader(r.Body)
 			if err != nil {
-				logger.Sugar.Errorf("During compression error ocurred - %v")
+				log.Errorf("During compression error ocurred - %v")
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}

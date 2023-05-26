@@ -34,8 +34,8 @@ type apiLogger interface {
 
 var log apiLogger
 
-func Routers(ms Store, logg apiLogger) chi.Router {
-	log = logg
+func Routers(ms Store, logging apiLogger) chi.Router {
+	log = logging
 	r := chi.NewRouter()
 	r.Use(logger.WithLogging)
 	r.Use(gzipMiddleware)
