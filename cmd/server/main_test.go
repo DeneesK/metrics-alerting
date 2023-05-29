@@ -49,7 +49,8 @@ func Test_update_json(t *testing.T) {
 	}
 	log, err := logger.LoggerInitializer("info")
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
+		return
 	}
 	ms := storage.NewMemStorage("", 0, false, log)
 	ts := httptest.NewServer(RouterWithoutMiddlewares(ms))
