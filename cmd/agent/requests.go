@@ -77,7 +77,7 @@ func sendMetrics(ms Collector, runAddr string) error {
 
 func send(session *grequests.Session, url string, metricType string, metricName string, value interface{}) (int, error) {
 	m := models.Metrics{Delta: &cvalue, Value: &gvalue}
-	m.ID = metricName // перенеси сразу в структуру
+	m.ID = metricName
 	m.MType = metricType
 	switch metricType {
 	case "counter":

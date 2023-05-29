@@ -10,6 +10,7 @@ import (
 	"github.com/DeneesK/metrics-alerting/internal/models"
 	"github.com/DeneesK/metrics-alerting/internal/storage"
 	"github.com/go-chi/chi"
+	"go.uber.org/zap"
 )
 
 const (
@@ -24,17 +25,9 @@ type Store interface {
 	GetGaugeMetrics() map[string]float64
 }
 
-type apiLogger interface {
-	Fatal(args ...interface{})
-	Error(args ...interface{})
-	Errorf(template string, args ...interface{})
-	Info(args ...interface{})
-	Infof(template string, args ...interface{})
-}
+var log *zap.SugaredLogger
 
-var log apiLogger
-
-func Routers(ms Store, logging apiLogger) chi.Router {
+func Routers(ms Store, logging *zap.SugaredLogger) chi.Router {
 	log = logging
 	r := chi.NewRouter()
 	r.Use(logger.WithLogging)
@@ -98,34 +91,35 @@ func ValueJSON(storage Store) http.HandlerFunc {
 			return
 		}
 		value, ok, err := storage.GetValue(metric.MType, metric.ID)
-		if err != nil {
-			log.Error(err)
-		} else if ok {
-			switch metric.MType {
-			case "counter":
-				metric.Delta = &value.Counter
-				resp, err := json.Marshal(&metric)
-				if err != nil {
-					res.WriteHeader(http.StatusBadRequest)
-					return
-				}
-				res.Header().Add("Content-Type", contentType)
-				res.WriteHeader(http.StatusOK)
-				res.Write(resp)
-			case "gauge":
-				metric.Value = &value.Gauge
-				resp, err := json.Marshal(&metric)
-				if err != nil {
-					res.WriteHeader(http.StatusBadRequest)
-					return
-				}
-				res.Header().Add("Content-Type", contentType)
-				res.WriteHeader(http.StatusOK)
-				res.Write(resp)
-			}
+		if err != nil || !ok {
+			log.Errorf("unable to find value in storage, metric type exists: %v, ocurred error: %v", ok, err)
+			res.WriteHeader(http.StatusNotFound)
 			return
 		}
-		res.WriteHeader(http.StatusNotFound)
+		switch metric.MType {
+		case "counter":
+			metric.Delta = &value.Counter
+			resp, err := json.Marshal(&metric)
+			if err != nil {
+				res.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			res.Header().Add("Content-Type", contentType)
+			res.WriteHeader(http.StatusOK)
+			res.Write(resp)
+			return
+		case "gauge":
+			metric.Value = &value.Gauge
+			resp, err := json.Marshal(&metric)
+			if err != nil {
+				res.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			res.Header().Add("Content-Type", contentType)
+			res.WriteHeader(http.StatusOK)
+			res.Write(resp)
+			return
+		}
 	}
 }
 
@@ -171,7 +165,7 @@ func Value(storage Store) http.HandlerFunc {
 			case "counter":
 				res.Write([]byte(strconv.FormatInt(value.Counter, 10)))
 			case "gauge":
-				res.Write([]byte(strconv.FormatFloat(value.Gauge, byte(102), -1, 64)))
+				res.Write([]byte(strconv.FormatFloat(value.Gauge, 'f', -1, 64)))
 			}
 			return
 		}

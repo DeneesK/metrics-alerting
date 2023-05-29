@@ -6,20 +6,14 @@ import (
 	"path"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 const (
 	counterMetric string = "counter"
 	gaugeMetric   string = "gauge"
 )
-
-type storageLogger interface {
-	Fatal(args ...interface{})
-	Error(args ...interface{})
-	Errorf(template string, args ...interface{})
-	Info(args ...interface{})
-	Infof(template string, args ...interface{})
-}
 
 type Result struct {
 	Counter int64
@@ -99,10 +93,10 @@ type MemStorage struct {
 	counter       counter
 	filePath      string
 	storeInterval time.Duration
-	log           storageLogger
+	log           *zap.SugaredLogger
 }
 
-func NewMemStorage(filePath string, storeInterval int, isRestore bool, log storageLogger) *MemStorage {
+func NewMemStorage(filePath string, storeInterval int, isRestore bool, log *zap.SugaredLogger) *MemStorage {
 	ms := MemStorage{
 		gauge:         gauge{g: make(map[string]float64)},
 		counter:       counter{c: make(map[string]int64)},

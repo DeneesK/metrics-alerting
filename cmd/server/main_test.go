@@ -49,12 +49,13 @@ func Test_update_json(t *testing.T) {
 	}
 	log, err := logger.LoggerInitializer("info")
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 	ms := storage.NewMemStorage("", 0, false, log)
 	ts := httptest.NewServer(RouterWithoutMiddlewares(ms))
 	defer ts.Close()
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			res, err := json.Marshal(&test.args)
 			require.NoError(t, err)
