@@ -16,8 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var metricCounter int64 = 1
-
 func RouterWithoutMiddlewares(ms *storage.MemStorage) chi.Router {
 	r := chi.NewRouter()
 	r.Post("/update/{metricType}/{metricName}/{value}", api.Update(ms))
@@ -29,6 +27,7 @@ func RouterWithoutMiddlewares(ms *storage.MemStorage) chi.Router {
 }
 
 func Test_update_json(t *testing.T) {
+	var metricCounter int64 = 1
 	type want struct {
 		code        int
 		contentType string
@@ -116,6 +115,7 @@ func Test_update(t *testing.T) {
 	ts := httptest.NewServer(RouterWithoutMiddlewares(ms))
 	defer ts.Close()
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			request, err := http.NewRequest(http.MethodPost, ts.URL+test.args, nil)
 			require.NoError(t, err)

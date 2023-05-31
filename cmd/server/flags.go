@@ -35,7 +35,7 @@ func parseFlags() (Conf, error) {
 	if envIsRestore := os.Getenv("RESTORE"); envIsRestore != "" {
 		envIsRestore, err := strconv.ParseBool(envIsRestore)
 		if err != nil {
-			return Conf{}, err
+			return Conf{}, fmt.Errorf("value of RESTORE is not a boolean: %w", err)
 		}
 		conf.isRestore = envIsRestore
 	}

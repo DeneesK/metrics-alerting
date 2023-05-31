@@ -38,7 +38,7 @@ type Collector interface {
 func sendMetrics(ms Collector, runAddr string) error {
 	url, err := url.JoinPath("http://", runAddr, "update", "/")
 	if err != nil {
-		return err
+		return fmt.Errorf("during attempt to create url error ocurred - %v", err)
 	}
 	runtimeMetrics := ms.GetRuntimeMetrics()
 	cpuMetrics := runtimeMetrics.GetCPUMetrics()
@@ -54,12 +54,12 @@ func sendMetrics(ms Collector, runAddr string) error {
 
 	for k, v := range cpuMetrics {
 		if _, err := send(session, url, gaugeMetric, k, v); err != nil {
-			return err
+			return fmt.Errorf("during attempt to send data error ocurred - %v", err)
 		}
 	}
 	for k, v := range memMetrics {
 		if _, err := send(session, url, gaugeMetric, k, v); err != nil {
-			return err
+			return fmt.Errorf("during attempt to send data error ocurred - %v", err)
 		}
 	}
 	if _, err := send(session, url, gaugeMetric, randomValue, ms.GetRandomValue()); err != nil {
@@ -67,7 +67,7 @@ func sendMetrics(ms Collector, runAddr string) error {
 	}
 	statusCode, err := send(session, url, counterMetric, pollCount, ms.GetPollCount())
 	if err != nil {
-		return err
+		return fmt.Errorf("during attempt to send data error ocurred - %v", err)
 	}
 	if statusCode == http.StatusOK {
 		ms.ResetPollCount()
@@ -103,11 +103,11 @@ func send(session *grequests.Session, url string, metricType string, metricName 
 	}
 	res, err := json.Marshal(&m)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("serialisation error - %v", err)
 	}
 	r, err := compress(res)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("compressing error - %v", err)
 	}
 	resp, err := session.Post(url, &grequests.RequestOptions{JSON: r})
 	if err != nil {
@@ -127,6 +127,9 @@ func compress(b []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	gz.Close()
+	err = gz.Close()
+	if err != nil {
+		return nil, err
+	}
 	return buf.Bytes(), nil
 }

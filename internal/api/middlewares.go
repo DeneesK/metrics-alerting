@@ -5,7 +5,29 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
+
+type responseData struct {
+	status int
+	size   int
+}
+
+type loggingResponseWriter struct {
+	http.ResponseWriter
+	responseData *responseData
+}
+
+func (r *loggingResponseWriter) Write(b []byte) (int, error) {
+	size, err := r.ResponseWriter.Write(b)
+	r.responseData.size += size
+	return size, err
+}
+
+func (r *loggingResponseWriter) WriteHeader(statusCode int) {
+	r.ResponseWriter.WriteHeader(statusCode)
+	r.responseData.status = statusCode
+}
 
 type compressWriter struct {
 	http.ResponseWriter
@@ -37,7 +59,6 @@ func newCompressReader(r io.ReadCloser) (*compressReader, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return &compressReader{
 		r:  r,
 		zr: zr,
@@ -57,13 +78,12 @@ func (c *compressReader) Close() error {
 
 func gzipMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ow := w
 		acceptEncoding := r.Header.Get("Accept-Encoding")
 		supportsGzip := strings.Contains(acceptEncoding, "gzip")
 		if supportsGzip {
 			cw := newCompressWriter(w)
 			cw.Header().Add("Content-Encoding", "gzip")
-			ow = cw
+			w = cw
 			defer cw.Close()
 		}
 		contentEncoding := r.Header.Get("Content-Encoding")
@@ -78,6 +98,29 @@ func gzipMiddleware(next http.Handler) http.Handler {
 			r.Body = cr
 			defer cr.Close()
 		}
-		next.ServeHTTP(ow, r)
+		next.ServeHTTP(w, r)
+	})
+}
+
+func withLogging(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		responseData := &responseData{
+			status: 0,
+			size:   0,
+		}
+		lw := loggingResponseWriter{
+			ResponseWriter: w,
+			responseData:   responseData,
+		}
+		start := time.Now()
+		h.ServeHTTP(&lw, r)
+		duration := time.Since(start)
+		log.Infoln(
+			"uri", r.RequestURI,
+			"method", r.Method,
+			"status", responseData.status,
+			"duration", duration,
+			"size", responseData.size,
+		)
 	})
 }

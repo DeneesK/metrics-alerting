@@ -38,6 +38,7 @@ func Test_postReport(t *testing.T) {
 	ro := grequests.RequestOptions{Headers: map[string]string{"Content-Type": "application/json"}}
 	session := grequests.NewSession(&ro)
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Method == http.MethodPost {

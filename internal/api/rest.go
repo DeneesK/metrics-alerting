@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/DeneesK/metrics-alerting/internal/logger"
 	"github.com/DeneesK/metrics-alerting/internal/models"
 	"github.com/DeneesK/metrics-alerting/internal/storage"
 	"github.com/go-chi/chi"
@@ -30,7 +29,7 @@ var log *zap.SugaredLogger
 func Routers(ms Store, logging *zap.SugaredLogger) chi.Router {
 	log = logging
 	r := chi.NewRouter()
-	r.Use(logger.WithLogging)
+	r.Use(withLogging)
 	r.Use(gzipMiddleware)
 	r.Post("/update/", UpdateJSON(ms))
 	r.Post("/value/", ValueJSON(ms))
@@ -44,6 +43,7 @@ func UpdateJSON(storage Store) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		var metric models.Metrics
 		if err := json.NewDecoder(req.Body).Decode(&metric); err != nil {
+			log.Errorf("during attempt to deserializing error ocurred: %v", err)
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -52,6 +52,7 @@ func UpdateJSON(storage Store) http.HandlerFunc {
 			storage.Store(metric.MType, metric.ID, *metric.Value)
 			resp, err := json.Marshal(&metric)
 			if err != nil {
+				log.Errorf("during attempt to serializing error ocurred: %v", err)
 				res.WriteHeader(http.StatusBadRequest)
 				return
 			}
@@ -61,21 +62,21 @@ func UpdateJSON(storage Store) http.HandlerFunc {
 		case "counter":
 			storage.Store(metric.MType, metric.ID, *metric.Delta)
 			value, ok, err := storage.GetValue(metric.MType, metric.ID)
-			if ok {
-				metric.Delta = &value.Counter
-				resp, err := json.Marshal(&metric)
-				if err != nil {
-					res.WriteHeader(http.StatusBadRequest)
-					return
-				}
-				res.Header().Add("Content-Type", contentType)
-				res.WriteHeader(http.StatusOK)
-				res.Write(resp)
+			if err != nil || !ok {
+				log.Errorf("unable to find value in storage, metric type exists: %v, ocurred error: %v", ok, err)
+				res.WriteHeader(http.StatusNotFound)
+				return
 			}
+			metric.Delta = &value.Counter
+			resp, err := json.Marshal(&metric)
 			if err != nil {
+				log.Errorf("during attempt to serializing error ocurred: %v", err)
 				res.WriteHeader(http.StatusBadRequest)
 				return
 			}
+			res.Header().Add("Content-Type", contentType)
+			res.WriteHeader(http.StatusOK)
+			res.Write(resp)
 		default:
 			res.WriteHeader(http.StatusBadRequest)
 			return
@@ -101,6 +102,7 @@ func ValueJSON(storage Store) http.HandlerFunc {
 			metric.Delta = &value.Counter
 			resp, err := json.Marshal(&metric)
 			if err != nil {
+				log.Errorf("during attempt to serializing error ocurred: %v", err)
 				res.WriteHeader(http.StatusBadRequest)
 				return
 			}
@@ -112,6 +114,7 @@ func ValueJSON(storage Store) http.HandlerFunc {
 			metric.Value = &value.Gauge
 			resp, err := json.Marshal(&metric)
 			if err != nil {
+				log.Errorf("during attempt to serializing error ocurred: %v", err)
 				res.WriteHeader(http.StatusBadRequest)
 				return
 			}
@@ -132,6 +135,7 @@ func Update(storage Store) http.HandlerFunc {
 		case "gauge":
 			v, err := strconv.ParseFloat(valueString, 64)
 			if err != nil {
+				log.Errorf("during attempt to parse value error ocurred: %v", err)
 				res.WriteHeader(http.StatusBadRequest)
 				return
 			}
@@ -139,6 +143,7 @@ func Update(storage Store) http.HandlerFunc {
 		case "counter":
 			v, err := strconv.ParseInt(valueString, 10, 64)
 			if err != nil {
+				log.Errorf("during attempt to parse value error ocurred: %v", err)
 				res.WriteHeader(http.StatusBadRequest)
 				return
 			}
@@ -158,7 +163,8 @@ func Value(storage Store) http.HandlerFunc {
 		metricType := chi.URLParam(req, "metricType")
 		metricName := chi.URLParam(req, "metricName")
 		value, ok, err := storage.GetValue(metricType, metricName)
-		if ok {
+		if err != nil || !ok {
+			log.Errorf("unable to find value in storage, metric type exists: %v, ocurred error: %v", ok, err)
 			res.Header().Add("Content-Type", contentTypeText)
 			res.WriteHeader(http.StatusOK)
 			switch metricType {
@@ -168,9 +174,6 @@ func Value(storage Store) http.HandlerFunc {
 				res.Write([]byte(strconv.FormatFloat(value.Gauge, 'f', -1, 64)))
 			}
 			return
-		}
-		if err != nil {
-			log.Error(err)
 		}
 		res.WriteHeader(http.StatusNotFound)
 	}
