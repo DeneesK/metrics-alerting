@@ -162,17 +162,17 @@ func Value(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 		value, ok, err := storage.GetValue(metricType, metricName)
 		if err != nil || !ok {
 			log.Errorf("unable to find value in storage, metric type exists: %v, ocurred error: %v", ok, err)
-			res.Header().Add("Content-Type", contentTypeText)
-			res.WriteHeader(http.StatusOK)
-			switch metricType {
-			case "counter":
-				res.Write([]byte(strconv.FormatInt(value.Counter, 10)))
-			case "gauge":
-				res.Write([]byte(strconv.FormatFloat(value.Gauge, 'f', -1, 64)))
-			}
+			res.WriteHeader(http.StatusNotFound)
 			return
 		}
-		res.WriteHeader(http.StatusNotFound)
+		res.Header().Add("Content-Type", contentTypeText)
+		res.WriteHeader(http.StatusOK)
+		switch metricType {
+		case "counter":
+			res.Write([]byte(strconv.FormatInt(value.Counter, 10)))
+		case "gauge":
+			res.Write([]byte(strconv.FormatFloat(value.Gauge, 'f', -1, 64)))
+		}
 	}
 }
 
