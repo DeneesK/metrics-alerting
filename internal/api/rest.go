@@ -24,22 +24,19 @@ type Store interface {
 	GetGaugeMetrics() map[string]float64
 }
 
-var log *zap.SugaredLogger
-
 func Routers(ms Store, logging *zap.SugaredLogger) chi.Router {
-	log = logging
 	r := chi.NewRouter()
-	r.Use(withLogging)
-	r.Use(gzipMiddleware)
-	r.Post("/update/", UpdateJSON(ms))
-	r.Post("/value/", ValueJSON(ms))
-	r.Post("/update/{metricType}/{metricName}/{value}", Update(ms))
-	r.Get("/value/{metricType}/{metricName}", Value(ms))
-	r.Get("/", Metrics(ms))
+	r.Use(withLogging(logging))
+	r.Use(gzipMiddleware(logging))
+	r.Post("/update/", UpdateJSON(ms, logging))
+	r.Post("/value/", ValueJSON(ms, logging))
+	r.Post("/update/{metricType}/{metricName}/{value}", Update(ms, logging))
+	r.Get("/value/{metricType}/{metricName}", Value(ms, logging))
+	r.Get("/", Metrics(ms, logging))
 	return r
 }
 
-func UpdateJSON(storage Store) http.HandlerFunc {
+func UpdateJSON(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		var metric models.Metrics
 		if err := json.NewDecoder(req.Body).Decode(&metric); err != nil {
@@ -84,7 +81,7 @@ func UpdateJSON(storage Store) http.HandlerFunc {
 	}
 }
 
-func ValueJSON(storage Store) http.HandlerFunc {
+func ValueJSON(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		var metric models.Metrics
 		if err := json.NewDecoder(req.Body).Decode(&metric); err != nil {
@@ -126,7 +123,7 @@ func ValueJSON(storage Store) http.HandlerFunc {
 	}
 }
 
-func Update(storage Store) http.HandlerFunc {
+func Update(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		metricType := chi.URLParam(req, "metricType")
 		metricName := chi.URLParam(req, "metricName")
@@ -158,7 +155,7 @@ func Update(storage Store) http.HandlerFunc {
 	}
 }
 
-func Value(storage Store) http.HandlerFunc {
+func Value(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		metricType := chi.URLParam(req, "metricType")
 		metricName := chi.URLParam(req, "metricName")
@@ -179,7 +176,7 @@ func Value(storage Store) http.HandlerFunc {
 	}
 }
 
-func Metrics(storage Store) http.HandlerFunc {
+func Metrics(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 	return func(res http.ResponseWriter, _ *http.Request) {
 		c := storage.GetCounterMetrics()
 		g := storage.GetGaugeMetrics()

@@ -14,15 +14,16 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
-func RouterWithoutMiddlewares(ms *storage.MemStorage) chi.Router {
+func RouterWithoutMiddlewares(ms *storage.MemStorage, logging *zap.SugaredLogger) chi.Router {
 	r := chi.NewRouter()
-	r.Post("/update/{metricType}/{metricName}/{value}", api.Update(ms))
-	r.Get("/value/{metricType}/{metricName}", api.Value(ms))
-	r.Post("/update/", api.UpdateJSON(ms))
-	r.Post("/value/", api.ValueJSON(ms))
-	r.Get("/", api.Metrics(ms))
+	r.Post("/update/{metricType}/{metricName}/{value}", api.Update(ms, logging))
+	r.Get("/value/{metricType}/{metricName}", api.Value(ms, logging))
+	r.Post("/update/", api.UpdateJSON(ms, logging))
+	r.Post("/value/", api.ValueJSON(ms, logging))
+	r.Get("/", api.Metrics(ms, logging))
 	return r
 }
 
@@ -46,13 +47,13 @@ func Test_update_json(t *testing.T) {
 			},
 		},
 	}
-	log, err := logger.LoggerInitializer("info")
+	log, err := logger.LoggerInitializer("fatal")
 	if err != nil {
 		t.Error(err)
 		return
 	}
 	ms := storage.NewMemStorage("", 0, false, log)
-	ts := httptest.NewServer(RouterWithoutMiddlewares(ms))
+	ts := httptest.NewServer(RouterWithoutMiddlewares(ms, log))
 	defer ts.Close()
 	for _, test := range tests {
 		test := test
@@ -107,12 +108,13 @@ func Test_update(t *testing.T) {
 			},
 		},
 	}
-	log, err := logger.LoggerInitializer("info")
+	log, err := logger.LoggerInitializer("fatal")
 	if err != nil {
-		log.Fatal(err)
+		t.Error(err)
+		return
 	}
 	ms := storage.NewMemStorage("", 0, false, log)
-	ts := httptest.NewServer(RouterWithoutMiddlewares(ms))
+	ts := httptest.NewServer(RouterWithoutMiddlewares(ms, log))
 	defer ts.Close()
 	for _, test := range tests {
 		test := test

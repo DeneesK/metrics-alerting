@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 type responseData struct {
@@ -76,51 +78,55 @@ func (c *compressReader) Close() error {
 	return c.zr.Close()
 }
 
-func gzipMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		acceptEncoding := r.Header.Get("Accept-Encoding")
-		supportsGzip := strings.Contains(acceptEncoding, "gzip")
-		if supportsGzip {
-			cw := newCompressWriter(w)
-			cw.Header().Add("Content-Encoding", "gzip")
-			w = cw
-			defer cw.Close()
-		}
-		contentEncoding := r.Header.Get("Content-Encoding")
-		sendsGzip := strings.Contains(contentEncoding, "gzip")
-		if sendsGzip {
-			cr, err := newCompressReader(r.Body)
-			if err != nil {
-				log.Errorf("During compression error ocurred - %v", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
+func gzipMiddleware(log *zap.SugaredLogger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			acceptEncoding := r.Header.Get("Accept-Encoding")
+			supportsGzip := strings.Contains(acceptEncoding, "gzip")
+			if supportsGzip {
+				cw := newCompressWriter(w)
+				cw.Header().Add("Content-Encoding", "gzip")
+				w = cw
+				defer cw.Close()
 			}
-			r.Body = cr
-			defer cr.Close()
-		}
-		next.ServeHTTP(w, r)
-	})
+			contentEncoding := r.Header.Get("Content-Encoding")
+			sendsGzip := strings.Contains(contentEncoding, "gzip")
+			if sendsGzip {
+				cr, err := newCompressReader(r.Body)
+				if err != nil {
+					log.Errorf("During compression error ocurred - %v", err)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				r.Body = cr
+				defer cr.Close()
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
-func withLogging(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		responseData := &responseData{
-			status: 0,
-			size:   0,
-		}
-		lw := loggingResponseWriter{
-			ResponseWriter: w,
-			responseData:   responseData,
-		}
-		start := time.Now()
-		h.ServeHTTP(&lw, r)
-		duration := time.Since(start)
-		log.Infoln(
-			"uri", r.RequestURI,
-			"method", r.Method,
-			"status", responseData.status,
-			"duration", duration,
-			"size", responseData.size,
-		)
-	})
+func withLogging(log *zap.SugaredLogger) func(http.Handler) http.Handler {
+	return func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			responseData := &responseData{
+				status: 0,
+				size:   0,
+			}
+			lw := loggingResponseWriter{
+				ResponseWriter: w,
+				responseData:   responseData,
+			}
+			start := time.Now()
+			h.ServeHTTP(&lw, r)
+			duration := time.Since(start)
+			log.Infoln(
+				"uri", r.RequestURI,
+				"method", r.Method,
+				"status", responseData.status,
+				"duration", duration,
+				"size", responseData.size,
+			)
+		})
+	}
 }
