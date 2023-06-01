@@ -117,7 +117,6 @@ func NewMemStorage(filePath string, storeInterval int, isRestore bool, log *zap.
 			}
 		}
 	}
-
 	return &ms
 }
 
