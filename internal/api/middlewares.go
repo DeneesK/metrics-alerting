@@ -87,11 +87,7 @@ func gzipMiddleware(log *zap.SugaredLogger) func(http.Handler) http.Handler {
 				cw := newCompressWriter(w)
 				cw.Header().Add("Content-Encoding", "gzip")
 				w = cw
-				err := cw.Close()
-				if err != nil {
-					log.Errorf("attempt to close compressor writer failed - %v", err)
-					return
-				}
+				defer cw.Close()
 			}
 			contentEncoding := r.Header.Get("Content-Encoding")
 			sendsGzip := strings.Contains(contentEncoding, "gzip")
@@ -103,10 +99,7 @@ func gzipMiddleware(log *zap.SugaredLogger) func(http.Handler) http.Handler {
 					return
 				}
 				r.Body = cr
-				err = cr.Close()
-				if err != nil {
-					log.Errorf("attempt to close compressor reader failed - %v", err)
-				}
+				defer cr.Close()
 			}
 			next.ServeHTTP(w, r)
 		})

@@ -133,16 +133,16 @@ func Update(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 		case "gauge":
 			v, err := strconv.ParseFloat(valueString, 64)
 			if err != nil {
-				log.Errorf("during attempt to parse value error ocurred: %v", err)
 				res.WriteHeader(http.StatusBadRequest)
+				log.Errorf("during attempt to parse value error ocurred: %v", err)
 				return
 			}
 			storage.Store(metricType, metricName, v)
 		case "counter":
 			v, err := strconv.ParseInt(valueString, 10, 64)
 			if err != nil {
-				log.Errorf("during attempt to parse value error ocurred: %v", err)
 				res.WriteHeader(http.StatusBadRequest)
+				log.Errorf("during attempt to parse value error ocurred: %v", err)
 				return
 			}
 			storage.Store(metricType, metricName, v)
