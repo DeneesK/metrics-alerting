@@ -105,15 +105,16 @@ func NewMemStorage(filePath string, storeInterval int, isRestore bool, log *zap.
 		log:           log,
 	}
 
-	if isRestore {
-		if err := ms.loadFromFile(filePath); err != nil {
-			ms.log.Errorf("during attempt to load from file, error occurred: %v", err)
+	if filePath != "" {
+		if isRestore {
+			if err := ms.loadFromFile(filePath); err != nil {
+				ms.log.Errorf("during attempt to load from file, error occurred: %v", err)
+			}
 		}
-	}
-
-	if filePath != "" && storeInterval != 0 {
-		if err := ms.startStoring(); err != nil {
-			ms.log.Errorf("during initializing of new storage, error occurred: %v", err)
+		if storeInterval != 0 {
+			if err := ms.startStoring(); err != nil {
+				ms.log.Errorf("during initializing of new storage, error occurred: %v", err)
+			}
 		}
 	}
 
@@ -123,15 +124,22 @@ func NewMemStorage(filePath string, storeInterval int, isRestore bool, log *zap.
 func (storage *MemStorage) Store(metricType, name string, value interface{}) error {
 	switch metricType {
 	case counterMetric:
-		v := value.(int64)
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("value cannot be cast to a specific type")
+		}
 		storage.counter.Store(name, v)
 		return nil
 	case gaugeMetric:
-		v := value.(float64)
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("value cannot be cast to a specific type")
+		}
 		storage.gauge.Store(name, v)
 		return nil
+	default:
+		return fmt.Errorf("metric type does not exist, given type: %v", metricType)
 	}
-	return fmt.Errorf("metric type does not exist, given type: %v", metricType)
 }
 
 func (storage *MemStorage) GetValue(metricType, name string) (Result, bool, error) {
@@ -176,7 +184,7 @@ func (storage *MemStorage) setMetrics(metrics *allMetrics) {
 func (storage *MemStorage) startStoring() error {
 	dir, _ := path.Split(storage.filePath)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		err := os.Mkdir(dir, 0666)
+		err := os.MkdirAll(dir, 0666)
 		if err != nil {
 			return err
 		}

@@ -120,6 +120,8 @@ func ValueJSON(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 			res.WriteHeader(http.StatusOK)
 			res.Write(resp)
 			return
+		default:
+			res.WriteHeader(http.StatusNotFound)
 		}
 	}
 }
@@ -173,6 +175,8 @@ func Value(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 			res.Write([]byte(strconv.FormatInt(value.Counter, 10)))
 		case "gauge":
 			res.Write([]byte(strconv.FormatFloat(value.Gauge, 'f', -1, 64)))
+		default:
+			res.WriteHeader(http.StatusNotFound)
 		}
 	}
 }

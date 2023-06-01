@@ -6,10 +6,8 @@ import (
 	"go.uber.org/zap"
 )
 
-var cfg zap.Config
-
 func LoggerInitializer(level string) (*zap.SugaredLogger, error) {
-	cfg = zap.NewProductionConfig()
+	cfg := zap.NewProductionConfig()
 	lvl, err := zap.ParseAtomicLevel(level)
 	if err != nil {
 		return nil, fmt.Errorf("attempt to parse logger level failed - %v", err)
