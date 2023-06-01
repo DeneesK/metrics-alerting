@@ -85,6 +85,7 @@ func ValueJSON(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		var metric models.Metrics
 		if err := json.NewDecoder(req.Body).Decode(&metric); err != nil {
+			log.Errorf("during body's decoding error ocurred: %v", err)
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
