@@ -34,7 +34,7 @@ func parseFlags() (Conf, error) {
 	if envFilePath, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok {
 		conf.filePath = envFilePath
 	}
-	if envDBDSN, ok := os.LookupEnv("DATABASE_DSN "); ok {
+	if envDBDSN, ok := os.LookupEnv("DATABASE_DSN"); ok {
 		conf.postgresDSN = envDBDSN
 	}
 	if envIsRestore, ok := os.LookupEnv("RESTORE"); ok {
