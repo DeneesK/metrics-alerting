@@ -22,6 +22,7 @@ type Store interface {
 	GetValue(typeMetric, name string) (storage.Result, bool, error)
 	GetCounterMetrics() map[string]int64
 	GetGaugeMetrics() map[string]float64
+	Ping() (bool, error)
 }
 
 func Routers(ms Store, logging *zap.SugaredLogger) chi.Router {
@@ -33,6 +34,7 @@ func Routers(ms Store, logging *zap.SugaredLogger) chi.Router {
 	r.Post("/update/{metricType}/{metricName}/{value}", Update(ms, logging))
 	r.Get("/value/{metricType}/{metricName}", Value(ms, logging))
 	r.Get("/", Metrics(ms, logging))
+	r.Get("/ping", Ping(ms, logging))
 	return r
 }
 
@@ -40,7 +42,7 @@ func UpdateJSON(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		var metric models.Metrics
 		if err := json.NewDecoder(req.Body).Decode(&metric); err != nil {
-			log.Errorf("during attempt to deserializing error ocurred: %v", err)
+			log.Debugf("during attempt to deserializing error ocurred: %v", err)
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -49,7 +51,7 @@ func UpdateJSON(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 			storage.Store(metric.MType, metric.ID, *metric.Value)
 			resp, err := json.Marshal(&metric)
 			if err != nil {
-				log.Errorf("during attempt to serializing error ocurred: %v", err)
+				log.Debugf("during attempt to serializing error ocurred: %v", err)
 				res.WriteHeader(http.StatusBadRequest)
 				return
 			}
@@ -60,14 +62,14 @@ func UpdateJSON(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 			storage.Store(metric.MType, metric.ID, *metric.Delta)
 			value, ok, err := storage.GetValue(metric.MType, metric.ID)
 			if err != nil || !ok {
-				log.Errorf("unable to find value in storage, metric type exists: %v, ocurred error: %v", ok, err)
+				log.Debugf("unable to find value in storage, metric type exists: %v, ocurred error: %v", ok, err)
 				res.WriteHeader(http.StatusNotFound)
 				return
 			}
 			metric.Delta = &value.Counter
 			resp, err := json.Marshal(&metric)
 			if err != nil {
-				log.Errorf("during attempt to serializing error ocurred: %v", err)
+				log.Debugf("during attempt to serializing error ocurred: %v", err)
 				res.WriteHeader(http.StatusBadRequest)
 				return
 			}
@@ -85,13 +87,13 @@ func ValueJSON(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		var metric models.Metrics
 		if err := json.NewDecoder(req.Body).Decode(&metric); err != nil {
-			log.Errorf("during body's decoding error ocurred: %v", err)
+			log.Debugf("during body's decoding error ocurred: %v", err)
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
 		value, ok, err := storage.GetValue(metric.MType, metric.ID)
 		if err != nil || !ok {
-			log.Errorf("unable to find value in storage, metric type exists: %v, ocurred error: %v", ok, err)
+			log.Debugf("unable to find value in storage, metric type exists: %v, ocurred error: %v", ok, err)
 			res.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -100,7 +102,7 @@ func ValueJSON(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 			metric.Delta = &value.Counter
 			resp, err := json.Marshal(&metric)
 			if err != nil {
-				log.Errorf("during attempt to serializing error ocurred: %v", err)
+				log.Debugf("during attempt to serializing error ocurred: %v", err)
 				res.WriteHeader(http.StatusBadRequest)
 				return
 			}
@@ -112,7 +114,7 @@ func ValueJSON(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 			metric.Value = &value.Gauge
 			resp, err := json.Marshal(&metric)
 			if err != nil {
-				log.Errorf("during attempt to serializing error ocurred: %v", err)
+				log.Debugf("during attempt to serializing error ocurred: %v", err)
 				res.WriteHeader(http.StatusBadRequest)
 				return
 			}
@@ -136,7 +138,7 @@ func Update(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 			v, err := strconv.ParseFloat(valueString, 64)
 			if err != nil {
 				res.WriteHeader(http.StatusBadRequest)
-				log.Errorf("during attempt to parse value error ocurred: %v", err)
+				log.Debugf("during attempt to parse value error ocurred: %v", err)
 				return
 			}
 			storage.Store(metricType, metricName, v)
@@ -144,7 +146,7 @@ func Update(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 			v, err := strconv.ParseInt(valueString, 10, 64)
 			if err != nil {
 				res.WriteHeader(http.StatusBadRequest)
-				log.Errorf("during attempt to parse value error ocurred: %v", err)
+				log.Debugf("during attempt to parse value error ocurred: %v", err)
 				return
 			}
 			storage.Store(metricType, metricName, v)
@@ -164,7 +166,7 @@ func Value(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 		metricName := chi.URLParam(req, "metricName")
 		value, ok, err := storage.GetValue(metricType, metricName)
 		if err != nil || !ok {
-			log.Errorf("unable to find value in storage, metric type exists: %v, ocurred error: %v", ok, err)
+			log.Debugf("unable to find value in storage, metric type exists: %v, ocurred error: %v", ok, err)
 			res.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -195,5 +197,19 @@ func Metrics(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 		res.Header().Add("Content-Type", "text/html")
 		res.WriteHeader(http.StatusOK)
 		res.Write([]byte(r))
+	}
+}
+
+func Ping(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
+	return func(res http.ResponseWriter, _ *http.Request) {
+		ok, err := storage.Ping()
+		if !ok && err != nil {
+			res.WriteHeader(http.StatusInternalServerError)
+			log.Debugf("database not available: %v", err)
+			return
+		}
+		res.Header().Add("Content-Type", "text/html")
+		res.WriteHeader(http.StatusOK)
+
 	}
 }

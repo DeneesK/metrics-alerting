@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -17,7 +18,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func RouterWithoutMiddlewares(ms *storage.MemStorage, logging *zap.SugaredLogger) chi.Router {
+func routerWithoutMiddlewares(ms *storage.MemStorage, logging *zap.SugaredLogger) chi.Router {
 	r := chi.NewRouter()
 	r.Post("/update/{metricType}/{metricName}/{value}", api.Update(ms, logging))
 	r.Get("/value/{metricType}/{metricName}", api.Value(ms, logging))
@@ -52,8 +53,9 @@ func Test_update_json(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	ms := storage.NewMemStorage("", 0, false, log)
-	ts := httptest.NewServer(RouterWithoutMiddlewares(ms, log))
+	pdns := fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", `localhost`, `metric`, `123qwe`, `metrics`)
+	ms := storage.NewMemStorage("", 0, false, log, pdns)
+	ts := httptest.NewServer(routerWithoutMiddlewares(ms, log))
 	defer ts.Close()
 	for _, test := range tests {
 		test := test
@@ -113,8 +115,9 @@ func Test_update(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	ms := storage.NewMemStorage("", 0, false, log)
-	ts := httptest.NewServer(RouterWithoutMiddlewares(ms, log))
+	pDNS := fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", `localhost`, `metric`, `123qwe`, `metrics`)
+	ms := storage.NewMemStorage("", 0, false, log, pDNS)
+	ts := httptest.NewServer(routerWithoutMiddlewares(ms, log))
 	defer ts.Close()
 	for _, test := range tests {
 		test := test

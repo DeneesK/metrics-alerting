@@ -7,6 +7,7 @@ import (
 	"github.com/DeneesK/metrics-alerting/internal/api"
 	"github.com/DeneesK/metrics-alerting/internal/logger"
 	"github.com/DeneesK/metrics-alerting/internal/storage"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 func main() {
@@ -24,7 +25,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	metricsStorage := storage.NewMemStorage(conf.filePath, conf.storeInterval, conf.isRestore, log)
+	metricsStorage := storage.NewMemStorage(conf.filePath, conf.storeInterval, conf.isRestore, log, conf.postgresDSN)
 	r := api.Routers(metricsStorage, log)
 	log.Infof("server started at %s", conf.runAddr)
 	return http.ListenAndServe(conf.runAddr, r)

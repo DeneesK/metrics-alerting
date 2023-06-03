@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"path"
@@ -94,9 +95,10 @@ type MemStorage struct {
 	filePath      string
 	storeInterval time.Duration
 	log           *zap.SugaredLogger
+	db            *sql.DB
 }
 
-func NewMemStorage(filePath string, storeInterval int, isRestore bool, log *zap.SugaredLogger) *MemStorage {
+func NewMemStorage(filePath string, storeInterval int, isRestore bool, log *zap.SugaredLogger, postgresDSN string) *MemStorage {
 	ms := MemStorage{
 		gauge:         gauge{g: make(map[string]float64)},
 		counter:       counter{c: make(map[string]int64)},
@@ -108,15 +110,23 @@ func NewMemStorage(filePath string, storeInterval int, isRestore bool, log *zap.
 	if filePath != "" {
 		if isRestore {
 			if err := ms.loadFromFile(filePath); err != nil {
-				ms.log.Errorf("during attempt to load from file, error occurred: %v", err)
+				ms.log.Debugf("during attempt to load from file, error occurred: %v", err)
 			}
 		}
 		if storeInterval != 0 {
 			if err := ms.startStoring(); err != nil {
-				ms.log.Errorf("during initializing of new storage, error occurred: %v", err)
+				ms.log.Debugf("during initializing of new storage, error occurred: %v", err)
 			}
 		}
 	}
+
+	db, err := dbSession(postgresDSN)
+	if err != nil {
+		ms.log.Debugf("during initializing of new db session, error occurred: %v", err)
+	}
+
+	ms.db = db
+
 	return &ms
 }
 
@@ -167,6 +177,14 @@ func (storage *MemStorage) GetGaugeMetrics() map[string]float64 {
 	return storage.gauge.LoadAll()
 }
 
+func (storage *MemStorage) Ping() (bool, error) {
+	err := storage.db.Ping()
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func (storage *MemStorage) saveToFile(path string) error {
 	return storeToFile(path, storage)
 }
@@ -196,7 +214,7 @@ func (storage *MemStorage) save() {
 	for {
 		time.Sleep(storage.storeInterval)
 		if err := storage.saveToFile(storage.filePath); err != nil {
-			storage.log.Errorf("during attempt to store data to file, error occurred: %v", err)
+			storage.log.Debugf("during attempt to store data to file, error occurred: %v", err)
 		}
 	}
 }
