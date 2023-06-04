@@ -81,6 +81,7 @@ func (ms *Metrics) GetRuntimeMetrics() RuntimeMetrics {
 	memStats["MSpanSys"] = ms.stats.MSpanSys
 	memStats["NextGC"] = ms.stats.NextGC
 	memStats["Mallocs"] = ms.stats.Mallocs
+	memStats["LastGC"] = ms.stats.LastGC
 	memStats["OtherSys"] = ms.stats.OtherSys
 	memStats["PauseTotalNs"] = ms.stats.PauseTotalNs
 	memStats["StackInuse"] = ms.stats.StackInuse

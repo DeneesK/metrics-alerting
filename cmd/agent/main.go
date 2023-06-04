@@ -8,15 +8,17 @@ import (
 )
 
 func main() {
-	if err := parseFlags(); err != nil {
+	conf, err := parseFlags()
+	if err != nil {
 		log.Fatal(err)
 	}
-	reportInterval := time.Duration(reportingInterval) * time.Second
-	ms := metriccollector.NewCollector(pollingInterval)
+	reportInterval := time.Duration(conf.reportingInterval) * time.Second
+	ms := metriccollector.NewCollector(conf.pollingInterval)
 	go ms.StartCollect()
-	log.Printf("client started sending data on %s", runAddr)
+	log.Printf("client started sending data on %s", conf.runAddr)
+
 	for {
-		if err := sendMetrics(&ms); err != nil {
+		if err := sendMetrics(&ms, conf.runAddr); err != nil {
 			log.Println(err)
 		}
 		time.Sleep(reportInterval)

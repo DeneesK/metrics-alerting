@@ -5,19 +5,27 @@ import (
 	"net/http"
 
 	"github.com/DeneesK/metrics-alerting/internal/api"
+	"github.com/DeneesK/metrics-alerting/internal/logger"
 	"github.com/DeneesK/metrics-alerting/internal/storage"
 )
 
 func main() {
-	parseFlags()
 	if err := run(); err != nil {
 		log.Fatal(err)
 	}
 }
 
 func run() error {
-	metricsStorage := storage.NewMemStorage()
-	r := api.Routers(&metricsStorage)
-	log.Printf("server started at %s", runAddr)
-	return http.ListenAndServe(runAddr, r)
+	conf, err := parseFlags()
+	if err != nil {
+		return err
+	}
+	log, err := logger.LoggerInitializer(conf.logLevel)
+	if err != nil {
+		return err
+	}
+	metricsStorage := storage.NewMemStorage(conf.filePath, conf.storeInterval, conf.isRestore, log)
+	r := api.Routers(metricsStorage, log)
+	log.Infof("server started at %s", conf.runAddr)
+	return http.ListenAndServe(conf.runAddr, r)
 }

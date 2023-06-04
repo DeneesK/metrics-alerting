@@ -1,78 +1,187 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 
+	"github.com/DeneesK/metrics-alerting/internal/models"
+	"github.com/DeneesK/metrics-alerting/internal/storage"
 	"github.com/go-chi/chi"
+	"go.uber.org/zap"
 )
 
 const (
-	contentTypeText = "text/plain; charset=utf-8"
+	contentType     = "application/json"
+	contentTypeText = "text/plain"
 )
 
 type Store interface {
-	Store(typeMetric, name, value string) error
-	GetValue(typeMetric, name string) (string, bool, error)
+	Store(typeMetric string, name string, value interface{}) error
+	GetValue(typeMetric, name string) (storage.Result, bool, error)
 	GetCounterMetrics() map[string]int64
 	GetGaugeMetrics() map[string]float64
 }
 
-func Routers(ms Store) chi.Router {
+func Routers(ms Store, logging *zap.SugaredLogger) chi.Router {
 	r := chi.NewRouter()
-	r.Post("/update/{metricType}/{metricName}/{value}", update(ms))
-	r.Get("/value/{metricType}/{metricName}", value(ms))
-	r.Get("/", metrics(ms))
+	r.Use(withLogging(logging))
+	r.Use(gzipMiddleware(logging))
+	r.Post("/update/", UpdateJSON(ms, logging))
+	r.Post("/value/", ValueJSON(ms, logging))
+	r.Post("/update/{metricType}/{metricName}/{value}", Update(ms, logging))
+	r.Get("/value/{metricType}/{metricName}", Value(ms, logging))
+	r.Get("/", Metrics(ms, logging))
 	return r
 }
 
-func update(storage Store) http.HandlerFunc {
+func UpdateJSON(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		var metric models.Metrics
+		if err := json.NewDecoder(req.Body).Decode(&metric); err != nil {
+			log.Errorf("during attempt to deserializing error ocurred: %v", err)
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		switch metric.MType {
+		case "gauge":
+			storage.Store(metric.MType, metric.ID, *metric.Value)
+			resp, err := json.Marshal(&metric)
+			if err != nil {
+				log.Errorf("during attempt to serializing error ocurred: %v", err)
+				res.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			res.Header().Add("Content-Type", contentType)
+			res.WriteHeader(http.StatusOK)
+			res.Write(resp)
+		case "counter":
+			storage.Store(metric.MType, metric.ID, *metric.Delta)
+			value, ok, err := storage.GetValue(metric.MType, metric.ID)
+			if err != nil || !ok {
+				log.Errorf("unable to find value in storage, metric type exists: %v, ocurred error: %v", ok, err)
+				res.WriteHeader(http.StatusNotFound)
+				return
+			}
+			metric.Delta = &value.Counter
+			resp, err := json.Marshal(&metric)
+			if err != nil {
+				log.Errorf("during attempt to serializing error ocurred: %v", err)
+				res.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			res.Header().Add("Content-Type", contentType)
+			res.WriteHeader(http.StatusOK)
+			res.Write(resp)
+		default:
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	}
+}
+
+func ValueJSON(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		var metric models.Metrics
+		if err := json.NewDecoder(req.Body).Decode(&metric); err != nil {
+			log.Errorf("during body's decoding error ocurred: %v", err)
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		value, ok, err := storage.GetValue(metric.MType, metric.ID)
+		if err != nil || !ok {
+			log.Errorf("unable to find value in storage, metric type exists: %v, ocurred error: %v", ok, err)
+			res.WriteHeader(http.StatusNotFound)
+			return
+		}
+		switch metric.MType {
+		case "counter":
+			metric.Delta = &value.Counter
+			resp, err := json.Marshal(&metric)
+			if err != nil {
+				log.Errorf("during attempt to serializing error ocurred: %v", err)
+				res.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			res.Header().Add("Content-Type", contentType)
+			res.WriteHeader(http.StatusOK)
+			res.Write(resp)
+			return
+		case "gauge":
+			metric.Value = &value.Gauge
+			resp, err := json.Marshal(&metric)
+			if err != nil {
+				log.Errorf("during attempt to serializing error ocurred: %v", err)
+				res.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			res.Header().Add("Content-Type", contentType)
+			res.WriteHeader(http.StatusOK)
+			res.Write(resp)
+			return
+		default:
+			res.WriteHeader(http.StatusNotFound)
+		}
+	}
+}
+
+func Update(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		metricType := chi.URLParam(req, "metricType")
 		metricName := chi.URLParam(req, "metricName")
 		valueString := chi.URLParam(req, "value")
 		switch metricType {
 		case "gauge":
-			if _, err := strconv.ParseFloat(valueString, 64); err != nil {
+			v, err := strconv.ParseFloat(valueString, 64)
+			if err != nil {
 				res.WriteHeader(http.StatusBadRequest)
+				log.Errorf("during attempt to parse value error ocurred: %v", err)
 				return
 			}
+			storage.Store(metricType, metricName, v)
 		case "counter":
-			if _, err := strconv.ParseInt(valueString, 10, 64); err != nil {
+			v, err := strconv.ParseInt(valueString, 10, 64)
+			if err != nil {
 				res.WriteHeader(http.StatusBadRequest)
+				log.Errorf("during attempt to parse value error ocurred: %v", err)
 				return
 			}
+			storage.Store(metricType, metricName, v)
 		default:
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		storage.Store(metricType, metricName, valueString)
+
 		res.Header().Add("Content-Type", contentTypeText)
 		res.WriteHeader(http.StatusOK)
 	}
 }
 
-func value(storage Store) http.HandlerFunc {
+func Value(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		metricType := chi.URLParam(req, "metricType")
 		metricName := chi.URLParam(req, "metricName")
 		value, ok, err := storage.GetValue(metricType, metricName)
-		if ok {
-			res.Header().Add("Content-Type", contentTypeText)
-			res.WriteHeader(http.StatusOK)
-			res.Write([]byte(value))
+		if err != nil || !ok {
+			log.Errorf("unable to find value in storage, metric type exists: %v, ocurred error: %v", ok, err)
+			res.WriteHeader(http.StatusNotFound)
 			return
 		}
-		if err != nil {
-			log.Panicln(err)
+		res.Header().Add("Content-Type", contentTypeText)
+		res.WriteHeader(http.StatusOK)
+		switch metricType {
+		case "counter":
+			res.Write([]byte(strconv.FormatInt(value.Counter, 10)))
+		case "gauge":
+			res.Write([]byte(strconv.FormatFloat(value.Gauge, 'f', -1, 64)))
+		default:
+			res.WriteHeader(http.StatusNotFound)
 		}
-		res.WriteHeader(http.StatusNotFound)
 	}
 }
 
-func metrics(storage Store) http.HandlerFunc {
+func Metrics(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 	return func(res http.ResponseWriter, _ *http.Request) {
 		c := storage.GetCounterMetrics()
 		g := storage.GetGaugeMetrics()
@@ -83,8 +192,8 @@ func metrics(storage Store) http.HandlerFunc {
 		for k, v := range g {
 			r += fmt.Sprintf("[%s]: %g\n", k, v)
 		}
-		res.Write([]byte(r))
-		res.Header().Add("Content-Type", contentTypeText)
+		res.Header().Add("Content-Type", "text/html")
 		res.WriteHeader(http.StatusOK)
+		res.Write([]byte(r))
 	}
 }

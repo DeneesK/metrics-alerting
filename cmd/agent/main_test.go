@@ -12,44 +12,46 @@ import (
 
 func Test_postReport(t *testing.T) {
 	type args struct {
-		url         string
 		contentType string
+		metricType  string
+		metricName  string
+		delta       uint64
 	}
 	tests := []struct {
 		name            string
 		args            args
-		wantURL         string
 		wantContentType string
 		wantCode        int
 	}{
 		{
 			name: "positive test #1",
 			args: args{
-				url:         "update/gauge/metric/1.5",
-				contentType: "text/plain",
+				contentType: "application/json",
+				metricType:  "counter",
+				metricName:  "metric",
+				delta:       10,
 			},
-			wantURL:         "/update/gauge/metric/1.5",
-			wantContentType: "text/plain",
+			wantContentType: "application/json",
 			wantCode:        200,
 		},
 	}
-	ro := grequests.RequestOptions{Headers: map[string]string{"Content-Type": "text/plain"}}
+	ro := grequests.RequestOptions{Headers: map[string]string{"Content-Type": "application/json"}}
 	session := grequests.NewSession(&ro)
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Method == http.MethodPost {
-					assert.Equal(t, r.URL.String(), test.wantURL)
 					assert.Equal(t, r.Header.Get("Content-Type"), test.wantContentType)
 					w.WriteHeader(http.StatusOK)
 				}
 				w.WriteHeader(http.StatusMethodNotAllowed)
 			}))
-			url, err := url.JoinPath(ts.URL, test.args.url)
+			url, err := url.JoinPath(ts.URL, "update")
 			assert.NoError(t, err)
-			resp, err := postReport(session, url)
+			statusCode, err := send(session, url, test.args.metricType, test.args.metricName, test.args.delta)
 			assert.NoError(t, err)
-			assert.Equal(t, resp.StatusCode, test.wantCode)
+			assert.Equal(t, statusCode, test.wantCode)
 			ts.Close()
 		})
 	}
