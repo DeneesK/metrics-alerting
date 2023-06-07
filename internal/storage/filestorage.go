@@ -2,7 +2,12 @@ package storage
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
+	"path"
+	"time"
+
+	"go.uber.org/zap"
 )
 
 type allMetrics struct {
@@ -13,6 +18,59 @@ type allMetrics struct {
 type producer struct {
 	file    *os.File
 	encoder *json.Encoder
+}
+
+type FileStorage struct {
+	memoryStorage *MemStorage
+	filePath      string
+	storeInterval time.Duration
+	log           *zap.SugaredLogger
+}
+
+func NewFileStorage(filePath string, storeInterval int, isRestore bool, log *zap.SugaredLogger) (*FileStorage, error) {
+	ms, err := NewMemStorage(log)
+	if err != nil {
+		return nil, fmt.Errorf("imposible to create new storage - %v", err)
+	}
+	fs := FileStorage{
+		memoryStorage: ms,
+		filePath:      filePath,
+		storeInterval: time.Duration(storeInterval) * time.Second,
+		log:           ms.log,
+	}
+
+	if isRestore {
+		if err := fs.loadFromFile(filePath); err != nil {
+			ms.log.Debugf("during attempt to load from file, error occurred: %v", err)
+		}
+	}
+	if storeInterval != 0 {
+		if err := fs.startStoring(); err != nil {
+			ms.log.Debugf("during initializing of new storage, error occurred: %v", err)
+		}
+	}
+
+	return &fs, nil
+}
+
+func (storage *FileStorage) Store(typeMetric string, name string, value interface{}) error {
+	return storage.memoryStorage.Store(typeMetric, name, value)
+}
+
+func (storage *FileStorage) GetCounterMetrics() map[string]int64 {
+	return storage.memoryStorage.GetCounterMetrics()
+}
+
+func (storage *FileStorage) GetGaugeMetrics() map[string]float64 {
+	return storage.memoryStorage.GetGaugeMetrics()
+}
+
+func (storage *FileStorage) GetValue(typeMetric, name string) (Result, bool, error) {
+	return storage.memoryStorage.GetValue(typeMetric, name)
+}
+
+func (storage *FileStorage) Ping() (bool, error) {
+	return storage.memoryStorage.Ping()
 }
 
 func newProducer(filename string) (*producer, error) {
@@ -57,7 +115,7 @@ func (c *consumer) close() error {
 	return c.file.Close()
 }
 
-func storeToFile(path string, m *MemStorage) error {
+func (storage *FileStorage) saveToFile(path string) error {
 	p, err := newProducer(path)
 	if err != nil {
 		return err
@@ -65,13 +123,13 @@ func storeToFile(path string, m *MemStorage) error {
 	defer p.close()
 	var metrics allMetrics
 
-	metrics.Counter = m.GetCounterMetrics()
-	metrics.Gauge = m.GetGaugeMetrics()
+	metrics.Counter = storage.memoryStorage.GetCounterMetrics()
+	metrics.Gauge = storage.memoryStorage.GetGaugeMetrics()
 
 	return p.writeMetrics(&metrics)
 }
 
-func loadFromFile(path string, m *MemStorage) error {
+func (storage *FileStorage) loadFromFile(path string) error {
 	c, err := newConsumer(path)
 	if err != nil {
 		return err
@@ -81,6 +139,27 @@ func loadFromFile(path string, m *MemStorage) error {
 	if err != nil {
 		return err
 	}
-	m.setMetrics(metrics)
+	storage.memoryStorage.setMetrics(metrics)
 	return nil
+}
+
+func (storage *FileStorage) startStoring() error {
+	dir, _ := path.Split(storage.filePath)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		err := os.MkdirAll(dir, 0666)
+		if err != nil {
+			return err
+		}
+	}
+	go storage.save()
+	return nil
+}
+
+func (storage *FileStorage) save() {
+	for {
+		time.Sleep(storage.storeInterval)
+		if err := storage.saveToFile(storage.filePath); err != nil {
+			storage.log.Debugf("during attempt to store data to file, error occurred: %v", err)
+		}
+	}
 }

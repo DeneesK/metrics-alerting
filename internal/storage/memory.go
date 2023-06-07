@@ -1,12 +1,8 @@
 package storage
 
 import (
-	"database/sql"
 	"fmt"
-	"os"
-	"path"
 	"sync"
-	"time"
 
 	"go.uber.org/zap"
 )
@@ -90,44 +86,18 @@ func (g *gauge) Store(key string, value float64) {
 }
 
 type MemStorage struct {
-	gauge         gauge
-	counter       counter
-	filePath      string
-	storeInterval time.Duration
-	log           *zap.SugaredLogger
-	db            *sql.DB
+	gauge   gauge
+	counter counter
+	log     *zap.SugaredLogger
 }
 
-func NewMemStorage(filePath string, storeInterval int, isRestore bool, log *zap.SugaredLogger, postgresDSN string) *MemStorage {
+func NewMemStorage(log *zap.SugaredLogger) (*MemStorage, error) {
 	ms := MemStorage{
-		gauge:         gauge{g: make(map[string]float64)},
-		counter:       counter{c: make(map[string]int64)},
-		filePath:      filePath,
-		storeInterval: time.Duration(storeInterval) * time.Second,
-		log:           log,
+		gauge:   gauge{g: make(map[string]float64)},
+		counter: counter{c: make(map[string]int64)},
+		log:     log,
 	}
-
-	if filePath != "" {
-		if isRestore {
-			if err := ms.loadFromFile(filePath); err != nil {
-				ms.log.Debugf("during attempt to load from file, error occurred: %v", err)
-			}
-		}
-		if storeInterval != 0 {
-			if err := ms.startStoring(); err != nil {
-				ms.log.Debugf("during initializing of new storage, error occurred: %v", err)
-			}
-		}
-	}
-
-	db, err := dbSession(postgresDSN)
-	if err != nil {
-		ms.log.Debugf("during initializing of new db session, error occurred: %v", err)
-	}
-
-	ms.db = db
-
-	return &ms
+	return &ms, nil
 }
 
 func (storage *MemStorage) Store(metricType, name string, value interface{}) error {
@@ -178,43 +148,10 @@ func (storage *MemStorage) GetGaugeMetrics() map[string]float64 {
 }
 
 func (storage *MemStorage) Ping() (bool, error) {
-	err := storage.db.Ping()
-	if err != nil {
-		return false, err
-	}
 	return true, nil
-}
-
-func (storage *MemStorage) saveToFile(path string) error {
-	return storeToFile(path, storage)
-}
-
-func (storage *MemStorage) loadFromFile(path string) error {
-	return loadFromFile(path, storage)
 }
 
 func (storage *MemStorage) setMetrics(metrics *allMetrics) {
 	storage.counter.set(metrics.Counter)
 	storage.gauge.set(metrics.Gauge)
-}
-
-func (storage *MemStorage) startStoring() error {
-	dir, _ := path.Split(storage.filePath)
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		err := os.MkdirAll(dir, 0666)
-		if err != nil {
-			return err
-		}
-	}
-	go storage.save()
-	return nil
-}
-
-func (storage *MemStorage) save() {
-	for {
-		time.Sleep(storage.storeInterval)
-		if err := storage.saveToFile(storage.filePath); err != nil {
-			storage.log.Debugf("during attempt to store data to file, error occurred: %v", err)
-		}
-	}
 }
