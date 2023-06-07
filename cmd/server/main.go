@@ -25,7 +25,10 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	metricsStorage := storage.NewMemStorage(conf.filePath, conf.storeInterval, conf.isRestore, log, conf.postgresDSN)
+	metricsStorage, err := storage.NewStorage(conf.filePath, conf.storeInterval, conf.isRestore, log, conf.postgresDSN)
+	if err != nil {
+		return err
+	}
 	r := api.Routers(metricsStorage, log)
 	log.Infof("server started at %s", conf.runAddr)
 	return http.ListenAndServe(conf.runAddr, r)

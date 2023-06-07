@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -18,7 +17,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func routerWithoutMiddlewares(ms *storage.MemStorage, logging *zap.SugaredLogger) chi.Router {
+func routerWithoutMiddlewares(ms storage.Storage, logging *zap.SugaredLogger) chi.Router {
 	r := chi.NewRouter()
 	r.Post("/update/{metricType}/{metricName}/{value}", api.Update(ms, logging))
 	r.Get("/value/{metricType}/{metricName}", api.Value(ms, logging))
@@ -53,8 +52,11 @@ func Test_update_json(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	pdns := fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", `localhost`, `metric`, `123qwe`, `metrics`)
-	ms := storage.NewMemStorage("", 0, false, log, pdns)
+	ms, err := storage.NewStorage("", 0, false, log, "")
+	if err != nil {
+		t.Error(err)
+		return
+	}
 	ts := httptest.NewServer(routerWithoutMiddlewares(ms, log))
 	defer ts.Close()
 	for _, test := range tests {
@@ -115,8 +117,11 @@ func Test_update(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	pDNS := fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", `localhost`, `metric`, `123qwe`, `metrics`)
-	ms := storage.NewMemStorage("", 0, false, log, pDNS)
+	ms, err := storage.NewStorage("", 0, false, log, "")
+	if err != nil {
+		t.Error(err)
+		return
+	}
 	ts := httptest.NewServer(routerWithoutMiddlewares(ms, log))
 	defer ts.Close()
 	for _, test := range tests {
