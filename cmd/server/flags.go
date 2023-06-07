@@ -18,6 +18,7 @@ type Conf struct {
 
 func parseFlags() (Conf, error) {
 	var conf Conf
+
 	flag.StringVar(&conf.runAddr, "a", ":8080", "address and port to run server")
 	flag.StringVar(&conf.logLevel, "l", "debug", "log level")
 	flag.StringVar(&conf.filePath, "f", "tmp/metrics-db.json", "path to store file")
