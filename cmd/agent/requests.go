@@ -41,7 +41,6 @@ func sendMetrics(ms Collector, runAddr string) error {
 	memMetrics := runtimeMetrics.GetMemMetrics()
 	length := len(cpuMetrics) + len(memMetrics) + additionalMetricsLen
 	metrics := make([]models.Metrics, 0, length)
-
 	ro := grequests.RequestOptions{Headers: map[string]string{
 		"Accept-Encoding":  encodeType,
 		"Content-Encoding": encodeType,
@@ -49,7 +48,6 @@ func sendMetrics(ms Collector, runAddr string) error {
 	}
 	session := grequests.NewSession(&ro)
 	defer session.CloseIdleConnections()
-
 	for k, v := range cpuMetrics {
 		metrics = append(metrics, models.Metrics{ID: k, MType: gaugeMetric, Value: &v})
 	}

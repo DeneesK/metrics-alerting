@@ -125,12 +125,12 @@ func (storage *MemStorage) Store(metricType, name string, value interface{}) err
 func (storage *MemStorage) StoreBanch(metrics []models.Metrics) error {
 	for _, m := range metrics {
 		if m.MType == "gauge" {
-			err := storage.Store(m.MType, m.ID, m.Value)
+			err := storage.Store(m.MType, m.ID, *m.Value)
 			if err != nil {
 				return fmt.Errorf("store banch to memory failed with error: %v", err)
 			}
 		} else {
-			err := storage.Store(m.MType, m.ID, m.Delta)
+			err := storage.Store(m.MType, m.ID, *m.Delta)
 			if err != nil {
 				return fmt.Errorf("store banch to memory failed with error: %v", err)
 			}
