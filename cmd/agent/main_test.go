@@ -12,7 +12,7 @@ import (
 )
 
 func Test_postReport(t *testing.T) {
-	var v float64 = 10.5
+	v := 10.5
 	metrics := make([]models.Metrics, 0)
 	type args struct {
 		metrics []models.Metrics
