@@ -56,9 +56,9 @@ func sendMetrics(ms Collector, runAddr string) error {
 		metrics = append(metrics, models.Metrics{ID: k, MType: gaugeMetric, Value: &vFloat64})
 	}
 	randomV := ms.GetRandomValue()
-	pollCount := ms.GetPollCount()
+	pollC := ms.GetPollCount()
 	metrics = append(metrics, models.Metrics{ID: randomValue, MType: gaugeMetric, Value: &randomV})
-	metrics = append(metrics, models.Metrics{ID: randomValue, MType: counterMetric, Delta: &pollCount})
+	metrics = append(metrics, models.Metrics{ID: pollCount, MType: counterMetric, Delta: &pollC})
 
 	statusCode, err := sendBanch(session, url, metrics)
 	if err != nil {
