@@ -7,6 +7,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/DeneesK/metrics-alerting/internal/models"
 	"go.uber.org/zap"
 )
 
@@ -55,6 +56,10 @@ func NewFileStorage(filePath string, storeInterval int, isRestore bool, log *zap
 
 func (storage *FileStorage) Store(typeMetric string, name string, value interface{}) error {
 	return storage.memoryStorage.Store(typeMetric, name, value)
+}
+
+func (storage *FileStorage) StoreBanch(metrics []models.Metrics) error {
+	return storage.memoryStorage.StoreBanch(metrics)
 }
 
 func (storage *FileStorage) GetCounterMetrics() map[string]int64 {

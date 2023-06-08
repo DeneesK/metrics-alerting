@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/DeneesK/metrics-alerting/internal/models"
 	"go.uber.org/zap"
 )
 
@@ -119,6 +120,24 @@ func (storage *MemStorage) Store(metricType, name string, value interface{}) err
 	default:
 		return fmt.Errorf("metric type does not exist, given type: %v", metricType)
 	}
+}
+
+func (storage *MemStorage) StoreBanch(metrics []models.Metrics) error {
+	for _, m := range metrics {
+		if m.MType == "gauge" {
+			err := storage.Store(m.MType, m.ID, m.Value)
+			if err != nil {
+				return fmt.Errorf("store banch to memory failed with error: %v", err)
+			}
+		} else {
+			err := storage.Store(m.MType, m.ID, m.Delta)
+			if err != nil {
+				return fmt.Errorf("store banch to memory failed with error: %v", err)
+			}
+		}
+
+	}
+	return nil
 }
 
 func (storage *MemStorage) GetValue(metricType, name string) (Result, bool, error) {

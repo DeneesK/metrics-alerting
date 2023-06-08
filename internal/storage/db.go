@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/DeneesK/metrics-alerting/internal/models"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"go.uber.org/zap"
 )
@@ -76,6 +77,30 @@ func (storage *DBStorage) Store(typeMetric string, name string, value interface{
 	return nil
 }
 
+func (storage *DBStorage) StoreBanch(metrics []models.Metrics) error {
+	ctx := context.Background()
+	if len(metrics) < 1001 {
+		if err := storage.insertBanch(ctx, metrics); err != nil {
+			return fmt.Errorf("postgres db error: %v", err)
+		}
+		return nil
+	}
+	banch := make([]models.Metrics, 0, 1000)
+	for _, m := range metrics {
+		banch = append(banch, m)
+		if len(banch) == 1000 {
+			if err := storage.insertBanch(ctx, metrics); err != nil {
+				return fmt.Errorf("postgres db error: %v", err)
+			}
+			banch = banch[:0]
+		}
+	}
+	if err := storage.insertBanch(ctx, banch); err != nil {
+		return fmt.Errorf("postgres db error: %v", err)
+	}
+	return nil
+}
+
 func (storage *DBStorage) GetValue(typeMetric, name string) (Result, bool, error) {
 	switch typeMetric {
 	case counterMetric:
@@ -105,6 +130,29 @@ func (storage *DBStorage) GetCounterMetrics() map[string]int64 {
 
 func (storage *DBStorage) GetGaugeMetrics() map[string]float64 {
 	return make(map[string]float64, 0)
+}
+
+func (storage *DBStorage) insertBanch(ctx context.Context, metrics []models.Metrics) error {
+	tx, err := storage.db.Begin()
+	if err != nil {
+		return err
+	}
+	// можно вызвать Rollback в defer,
+	// если Commit будет раньше, то откат проигнорируется
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, "INSERT INTO metrics VALUES($1,$2,$3,$4)")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, m := range metrics {
+		_, err := stmt.ExecContext(ctx, m.MType, m.ID, m.Delta, m.Value)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func createTable(session *sql.DB) error {

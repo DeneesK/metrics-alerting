@@ -14,17 +14,13 @@ import (
 )
 
 const (
-	counterMetric string = "counter"
-	gaugeMetric   string = "gauge"
-	contentType   string = "application/json"
-	pollCount     string = "PollCount"
-	randomValue   string = "RandomValue"
-	encodeType    string = "gzip"
-)
-
-var (
-	cvalue int64   = 0
-	gvalue float64 = 0
+	counterMetric        string = "counter"
+	gaugeMetric          string = "gauge"
+	contentType          string = "application/json"
+	pollCount            string = "PollCount"
+	randomValue          string = "RandomValue"
+	encodeType           string = "gzip"
+	additionalMetricsLen int    = 2
 )
 
 type Collector interface {
@@ -36,13 +32,15 @@ type Collector interface {
 }
 
 func sendMetrics(ms Collector, runAddr string) error {
-	url, err := url.JoinPath("http://", runAddr, "update", "/")
+	url, err := url.JoinPath("http://", runAddr, "updates", "/")
 	if err != nil {
 		return fmt.Errorf("during attempt to create url error ocurred - %v", err)
 	}
 	runtimeMetrics := ms.GetRuntimeMetrics()
 	cpuMetrics := runtimeMetrics.GetCPUMetrics()
 	memMetrics := runtimeMetrics.GetMemMetrics()
+	length := len(cpuMetrics) + len(memMetrics) + additionalMetricsLen
+	metrics := make([]models.Metrics, 0, length)
 
 	ro := grequests.RequestOptions{Headers: map[string]string{
 		"Accept-Encoding":  encodeType,
@@ -53,19 +51,18 @@ func sendMetrics(ms Collector, runAddr string) error {
 	defer session.CloseIdleConnections()
 
 	for k, v := range cpuMetrics {
-		if _, err := send(session, url, gaugeMetric, k, v); err != nil {
-			return fmt.Errorf("during attempt to send data error ocurred - %v", err)
-		}
+		metrics = append(metrics, models.Metrics{ID: k, MType: gaugeMetric, Value: &v})
 	}
 	for k, v := range memMetrics {
-		if _, err := send(session, url, gaugeMetric, k, v); err != nil {
-			return fmt.Errorf("during attempt to send data error ocurred - %v", err)
-		}
+		vFloat64 := float64(v)
+		metrics = append(metrics, models.Metrics{ID: k, MType: gaugeMetric, Value: &vFloat64})
 	}
-	if _, err := send(session, url, gaugeMetric, randomValue, ms.GetRandomValue()); err != nil {
-		return err
-	}
-	statusCode, err := send(session, url, counterMetric, pollCount, ms.GetPollCount())
+	randomV := ms.GetRandomValue()
+	pollCount := ms.GetPollCount()
+	metrics = append(metrics, models.Metrics{ID: randomValue, MType: gaugeMetric, Value: &randomV})
+	metrics = append(metrics, models.Metrics{ID: randomValue, MType: counterMetric, Delta: &pollCount})
+
+	statusCode, err := sendBanch(session, url, metrics)
 	if err != nil {
 		return fmt.Errorf("during attempt to send data error ocurred - %v", err)
 	}
@@ -75,33 +72,8 @@ func sendMetrics(ms Collector, runAddr string) error {
 	return nil
 }
 
-func send(session *grequests.Session, url string, metricType string, metricName string, value interface{}) (int, error) {
-	m := models.Metrics{Delta: &cvalue, Value: &gvalue}
-	m.ID = metricName
-	m.MType = metricType
-	switch metricType {
-	case "counter":
-		switch t := value.(type) {
-		case uint64:
-			*m.Delta = int64(value.(uint64))
-		case int64:
-			*m.Delta = value.(int64)
-		default:
-			return 0, fmt.Errorf("unable to send report, counter value must be uint64 or int64, have - %v", t)
-		}
-	case "gauge":
-		switch t := value.(type) {
-		case uint64:
-			*m.Value = float64(value.(uint64))
-		case float64:
-			*m.Value = value.(float64)
-		default:
-			return 0, fmt.Errorf("unable to send report, gauge value must be uint64 or float64, have - %v", t)
-		}
-	default:
-		return 0, fmt.Errorf("unable to send report, metricType must be counter or gauge, have - %v", metricType)
-	}
-	res, err := json.Marshal(&m)
+func sendBanch(session *grequests.Session, url string, metrics []models.Metrics) (int, error) {
+	res, err := json.Marshal(&metrics)
 	if err != nil {
 		return 0, fmt.Errorf("serialisation error - %v", err)
 	}

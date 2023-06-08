@@ -19,6 +19,7 @@ const (
 
 type Store interface {
 	Store(typeMetric string, name string, value interface{}) error
+	StoreBanch(metrics []models.Metrics) error
 	GetValue(typeMetric, name string) (storage.Result, bool, error)
 	GetCounterMetrics() map[string]int64
 	GetGaugeMetrics() map[string]float64
@@ -30,12 +31,30 @@ func Routers(ms Store, logging *zap.SugaredLogger) chi.Router {
 	r.Use(withLogging(logging))
 	r.Use(gzipMiddleware(logging))
 	r.Post("/update/", UpdateJSON(ms, logging))
+	r.Post("/updates/", UpdatesJSON(ms, logging))
 	r.Post("/value/", ValueJSON(ms, logging))
 	r.Post("/update/{metricType}/{metricName}/{value}", Update(ms, logging))
 	r.Get("/value/{metricType}/{metricName}", Value(ms, logging))
 	r.Get("/", Metrics(ms, logging))
 	r.Get("/ping", Ping(ms, logging))
 	return r
+}
+
+func UpdatesJSON(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		metrics := make([]models.Metrics, 0)
+		if err := json.NewDecoder(req.Body).Decode(&metrics); err != nil {
+			log.Debugf("during attempt to deserializing error ocurred: %v", err)
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if err := storage.StoreBanch(metrics); err != nil {
+			log.Debugf("during attempt to store banch of data error ocurred: %v", err)
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		res.WriteHeader(http.StatusOK)
+	}
 }
 
 func UpdateJSON(storage Store, log *zap.SugaredLogger) http.HandlerFunc {

@@ -6,16 +6,16 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/DeneesK/metrics-alerting/internal/models"
 	"github.com/levigross/grequests"
 	"github.com/stretchr/testify/assert"
 )
 
 func Test_postReport(t *testing.T) {
+	var v float64 = 10.5
+	metrics := make([]models.Metrics, 0)
 	type args struct {
-		contentType string
-		metricType  string
-		metricName  string
-		delta       uint64
+		metrics []models.Metrics
 	}
 	tests := []struct {
 		name            string
@@ -26,10 +26,7 @@ func Test_postReport(t *testing.T) {
 		{
 			name: "positive test #1",
 			args: args{
-				contentType: "application/json",
-				metricType:  "counter",
-				metricName:  "metric",
-				delta:       10,
+				metrics: append(metrics, models.Metrics{ID: "PollCount", MType: "gauge", Value: &v}),
 			},
 			wantContentType: "application/json",
 			wantCode:        200,
@@ -49,7 +46,7 @@ func Test_postReport(t *testing.T) {
 			}))
 			url, err := url.JoinPath(ts.URL, "update")
 			assert.NoError(t, err)
-			statusCode, err := send(session, url, test.args.metricType, test.args.metricName, test.args.delta)
+			statusCode, err := sendBanch(session, url, test.args.metrics)
 			assert.NoError(t, err)
 			assert.Equal(t, statusCode, test.wantCode)
 			ts.Close()
