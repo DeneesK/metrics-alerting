@@ -10,9 +10,9 @@ import (
 	"go.uber.org/zap"
 )
 
-const createTablestring = `CREATE TABLE IF NOT EXISTS metrics(
-	"metrictype" TEXT,
-	"metricname" TEXT,
+const createTableString = `CREATE TABLE IF NOT EXISTS metrics(
+	"metrictype" TEXT NOT NULL,
+	"metricname" TEXT NOT NULL UNIQUE,
 	"counter" INTEGER,
 	"gauge" DOUBLE PRECISION)`
 
@@ -58,16 +58,16 @@ func (storage *DBStorage) Store(typeMetric string, name string, value interface{
 		if !ok {
 			return fmt.Errorf("value cannot be cast to a specific type")
 		}
-		_, err := storage.db.Exec("INSERT INTO metrics VALUES ($1, $2, $3, $4)", counterMetric, name, v, 0)
+		_, err := storage.db.Exec("INSERT INTO metrics VALUES ($1, $2, $3, $4) ON CONFLICT (metricname) DO UPDATE SET counter=metrics.counter+$3", counterMetric, name, v, 0)
 		if err != nil {
-			return err
+			return fmt.Errorf("during attempt to store data to database error ocurred: %w", err)
 		}
 	case gaugeMetric:
 		v, ok := value.(float64)
 		if !ok {
 			return fmt.Errorf("value cannot be cast to a specific type")
 		}
-		_, err := storage.db.Exec("INSERT INTO metrics VALUES ($1, $2, $3, $4)", gaugeMetric, name, 0, v)
+		_, err := storage.db.Exec("INSERT INTO metrics VALUES ($1, $2, $3, $4) ON CONFLICT (metricname) DO UPDATE SET gauge=$4", gaugeMetric, name, 0, v)
 		if err != nil {
 			return err
 		}
@@ -81,7 +81,7 @@ func (storage *DBStorage) StoreBanch(metrics []models.Metrics) error {
 	ctx := context.Background()
 	if len(metrics) < 1001 {
 		if err := storage.insertBanch(ctx, metrics); err != nil {
-			return fmt.Errorf("postgres db error: %v", err)
+			return fmt.Errorf("postgres db error: %w", err)
 		}
 		return nil
 	}
@@ -90,13 +90,13 @@ func (storage *DBStorage) StoreBanch(metrics []models.Metrics) error {
 		banch = append(banch, m)
 		if len(banch) == 1000 {
 			if err := storage.insertBanch(ctx, metrics); err != nil {
-				return fmt.Errorf("postgres db error: %v", err)
+				return fmt.Errorf("postgres db error: %w", err)
 			}
 			banch = banch[:0]
 		}
 	}
 	if err := storage.insertBanch(ctx, banch); err != nil {
-		return fmt.Errorf("postgres db error: %v", err)
+		return fmt.Errorf("postgres db error: %w", err)
 	}
 	return nil
 }
@@ -140,10 +140,9 @@ func (storage *DBStorage) insertBanch(ctx context.Context, metrics []models.Metr
 	// можно вызвать Rollback в defer,
 	// если Commit будет раньше, то откат проигнорируется
 	defer tx.Rollback()
-
-	stmt, err := tx.PrepareContext(ctx, "INSERT INTO metrics VALUES($1,$2,$3,$4)")
+	stmt, err := tx.PrepareContext(ctx, "INSERT INTO metrics VALUES ($1, $2, $3, $4) ON CONFLICT (metricname) DO UPDATE SET gauge=$4, counter=metrics.counter+$3")
 	if err != nil {
-		return err
+		return fmt.Errorf("insert error: %w", err)
 	}
 	defer stmt.Close()
 	for _, m := range metrics {
@@ -156,7 +155,7 @@ func (storage *DBStorage) insertBanch(ctx context.Context, metrics []models.Metr
 }
 
 func createTable(session *sql.DB) error {
-	_, err := session.Exec(createTablestring)
+	_, err := session.Exec(createTableString)
 	if err != nil {
 		return err
 	}

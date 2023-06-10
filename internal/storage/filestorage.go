@@ -42,12 +42,12 @@ func NewFileStorage(filePath string, storeInterval int, isRestore bool, log *zap
 
 	if isRestore {
 		if err := fs.loadFromFile(filePath); err != nil {
-			ms.log.Debugf("during attempt to load from file, error occurred: %v", err)
+			ms.log.Debugf("during attempt to load from file, error occurred: %w", err)
 		}
 	}
 	if storeInterval != 0 {
 		if err := fs.startStoring(); err != nil {
-			ms.log.Debugf("during initializing of new storage, error occurred: %v", err)
+			ms.log.Debugf("during initializing of new storage, error occurred: %w", err)
 		}
 	}
 
