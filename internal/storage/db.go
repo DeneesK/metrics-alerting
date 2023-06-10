@@ -24,12 +24,12 @@ type DBStorage struct {
 func NewDBStorage(postgresDSN string, log *zap.SugaredLogger) (*DBStorage, error) {
 	db, err := NewDBSession(postgresDSN)
 	if err != nil {
-		return nil, fmt.Errorf("during initializing of new db session, error occurred: %v", err)
+		return nil, fmt.Errorf("during initializing of new db session, error occurred: %w", err)
 	}
 
 	err = createTable(db)
 	if err != nil {
-		return nil, fmt.Errorf("impossible to create table: %v", err)
+		return nil, fmt.Errorf("impossible to create table: %w", err)
 	}
 
 	return &DBStorage{log: log, db: db}, nil
