@@ -24,7 +24,7 @@ func parseFlags() (Conf, error) {
 	flag.StringVar(&conf.filePath, "f", "tmp/metrics-db.json", "path to store file")
 	flag.StringVar(&conf.postgresDSN, "d", "", "database's dsn connection configs")
 	flag.BoolVar(&conf.isRestore, "r", true, "load saved data")
-	flag.IntVar(&conf.storeInterval, "i", 5, "interval of storing data on disk")
+	flag.IntVar(&conf.storeInterval, "i", 300, "interval of storing data on disk")
 	flag.Parse()
 	if envRunAddr, ok := os.LookupEnv("ADDRESS"); ok {
 		conf.runAddr = envRunAddr

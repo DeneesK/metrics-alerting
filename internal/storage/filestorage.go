@@ -176,17 +176,6 @@ func (storage *FileStorage) save() {
 		time.Sleep(storage.storeInterval)
 		if err := storage.saveToFile(storage.filePath); err != nil {
 			storage.log.Debugf("during attempt to store data to file, error occurred: %v", err)
-			for i, atmp := range readAttempts {
-				time.Sleep(atmp)
-				err := storage.saveToFile(storage.filePath)
-				if err != nil && i < 2 {
-					continue
-				}
-				if err != nil && i == 2 {
-					storage.log.Fatalf("unable save data to file: %w", err)
-					return
-				}
-			}
 		}
 	}
 }
