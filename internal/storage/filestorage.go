@@ -119,7 +119,7 @@ func newConsumer(filename string) (*consumer, error) {
 }
 
 func (c *consumer) readMetrics() (*allMetrics, error) {
-	var data allMetrics
+	data := allMetrics{make(map[string]float64, 0), make(map[string]int64, 0)}
 	err := c.decoder.Decode(&data)
 	if err != nil && err != io.EOF {
 		return nil, err
