@@ -3,7 +3,6 @@ package storage
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path"
 	"time"
@@ -121,7 +120,7 @@ func newConsumer(filename string) (*consumer, error) {
 func (c *consumer) readMetrics() (*allMetrics, error) {
 	data := allMetrics{make(map[string]float64, 0), make(map[string]int64, 0)}
 	err := c.decoder.Decode(&data)
-	if err != nil && err != io.EOF {
+	if err != nil {
 		return nil, err
 	}
 	return &data, nil
