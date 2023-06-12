@@ -5,8 +5,10 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/DeneesK/metrics-alerting/internal/models"
 	"github.com/DeneesK/metrics-alerting/internal/services/metriccollector"
@@ -14,14 +16,19 @@ import (
 )
 
 const (
-	counterMetric        string = "counter"
-	gaugeMetric          string = "gauge"
-	contentType          string = "application/json"
-	pollCount            string = "PollCount"
-	randomValue          string = "RandomValue"
-	encodeType           string = "gzip"
-	additionalMetricsLen int    = 2
+	fstAttempt           time.Duration = time.Duration(1) * time.Second
+	sndAttempt           time.Duration = fstAttempt * 3
+	thirdAttempt         time.Duration = fstAttempt * 5
+	counterMetric        string        = "counter"
+	gaugeMetric          string        = "gauge"
+	contentType          string        = "application/json"
+	pollCount            string        = "PollCount"
+	randomValue          string        = "RandomValue"
+	encodeType           string        = "gzip"
+	additionalMetricsLen int           = 2
 )
+
+var conAttempts = []time.Duration{fstAttempt, sndAttempt, thirdAttempt}
 
 type Collector interface {
 	StartCollect()
@@ -34,7 +41,7 @@ type Collector interface {
 func sendMetrics(ms Collector, runAddr string) error {
 	url, err := url.JoinPath("http://", runAddr, "updates", "/")
 	if err != nil {
-		return fmt.Errorf("during attempt to create url error ocurred - %v", err)
+		return fmt.Errorf("during attempt to create url error ocurred - %w", err)
 	}
 	runtimeMetrics := ms.GetRuntimeMetrics()
 	cpuMetrics := runtimeMetrics.GetCPUMetrics()
@@ -62,7 +69,7 @@ func sendMetrics(ms Collector, runAddr string) error {
 
 	statusCode, err := sendBanch(session, url, metrics)
 	if err != nil {
-		return fmt.Errorf("during attempt to send data error ocurred - %v", err)
+		log.Fatalf("all attempts to establish a connection have been exhausted, during attempts to send data error ocurred - %v, ", err)
 	}
 	if statusCode == http.StatusOK {
 		ms.ResetPollCount()
@@ -73,15 +80,25 @@ func sendMetrics(ms Collector, runAddr string) error {
 func sendBanch(session *grequests.Session, url string, metrics []models.Metrics) (int, error) {
 	res, err := json.Marshal(&metrics)
 	if err != nil {
-		return 0, fmt.Errorf("serialisation error - %v", err)
+		return 0, fmt.Errorf("serialization error - %w", err)
 	}
 	r, err := compress(res)
 	if err != nil {
-		return 0, fmt.Errorf("compressing error - %v", err)
+		return 0, fmt.Errorf("compressing error - %w", err)
 	}
 	resp, err := session.Post(url, &grequests.RequestOptions{JSON: r})
 	if err != nil {
-		return 0, fmt.Errorf("unable to send report: %w", err)
+		for i, attempt := range conAttempts {
+			time.Sleep(attempt)
+			resp, err := session.Post(url, &grequests.RequestOptions{JSON: r})
+			if err != nil && i < 2 {
+				continue
+			}
+			defer resp.Close()
+			if err != nil && i == 2 {
+				return 0, fmt.Errorf("unable to send report: %w", err)
+			}
+		}
 	}
 	defer resp.Close()
 	return resp.StatusCode, nil

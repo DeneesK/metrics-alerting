@@ -4,13 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/DeneesK/metrics-alerting/internal/models"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"go.uber.org/zap"
 )
 
-const createTableString = `CREATE TABLE IF NOT EXISTS metrics(
+const createTableQuery = `CREATE TABLE IF NOT EXISTS metrics(
 	"metrictype" TEXT NOT NULL,
 	"metricname" TEXT NOT NULL UNIQUE,
 	"counter" INTEGER,
@@ -38,7 +39,16 @@ func NewDBStorage(postgresDSN string, log *zap.SugaredLogger) (*DBStorage, error
 func NewDBSession(postgresDSN string) (*sql.DB, error) {
 	db, err := sql.Open("pgx", postgresDSN)
 	if err != nil {
-		return nil, err
+		for i, atmp := range readAttempts {
+			time.Sleep(atmp)
+			db, err = sql.Open("pgx", postgresDSN)
+			if err != nil && i < 2 {
+				continue
+			}
+			if err != nil && i == 2 {
+				return nil, fmt.Errorf("unable to connect to db: %w", err)
+			}
+		}
 	}
 	return db, nil
 }
@@ -137,8 +147,6 @@ func (storage *DBStorage) insertBanch(ctx context.Context, metrics []models.Metr
 	if err != nil {
 		return err
 	}
-	// можно вызвать Rollback в defer,
-	// если Commit будет раньше, то откат проигнорируется
 	defer tx.Rollback()
 	stmt, err := tx.PrepareContext(ctx, "INSERT INTO metrics VALUES ($1, $2, $3, $4) ON CONFLICT (metricname) DO UPDATE SET gauge=$4, counter=metrics.counter+$3")
 	if err != nil {
@@ -155,7 +163,7 @@ func (storage *DBStorage) insertBanch(ctx context.Context, metrics []models.Metr
 }
 
 func createTable(session *sql.DB) error {
-	_, err := session.Exec(createTableString)
+	_, err := session.Exec(createTableQuery)
 	if err != nil {
 		return err
 	}

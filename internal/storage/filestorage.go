@@ -31,7 +31,7 @@ type FileStorage struct {
 func NewFileStorage(filePath string, storeInterval int, isRestore bool, log *zap.SugaredLogger) (*FileStorage, error) {
 	ms, err := NewMemStorage(log)
 	if err != nil {
-		return nil, fmt.Errorf("imposible to create new storage - %v", err)
+		return nil, fmt.Errorf("imposible to create new storage - %w", err)
 	}
 	fs := FileStorage{
 		memoryStorage: ms,
@@ -43,11 +43,22 @@ func NewFileStorage(filePath string, storeInterval int, isRestore bool, log *zap
 	if isRestore {
 		if err := fs.loadFromFile(filePath); err != nil {
 			ms.log.Debugf("during attempt to load from file, error occurred: %w", err)
+			for i, atmp := range readAttempts {
+				time.Sleep(atmp)
+				err := fs.loadFromFile(filePath)
+				if err != nil && i < 2 {
+					continue
+				}
+				if err != nil && i == 2 {
+					return nil, fmt.Errorf("unable to read file: %w", err)
+				}
+			}
 		}
 	}
 	if storeInterval != 0 {
 		if err := fs.startStoring(); err != nil {
 			ms.log.Debugf("during initializing of new storage, error occurred: %w", err)
+			return nil, err
 		}
 	}
 
@@ -165,6 +176,17 @@ func (storage *FileStorage) save() {
 		time.Sleep(storage.storeInterval)
 		if err := storage.saveToFile(storage.filePath); err != nil {
 			storage.log.Debugf("during attempt to store data to file, error occurred: %v", err)
+			for i, atmp := range readAttempts {
+				time.Sleep(atmp)
+				err := storage.saveToFile(storage.filePath)
+				if err != nil && i < 2 {
+					continue
+				}
+				if err != nil && i == 2 {
+					storage.log.Fatalf("unable save data to file: %w", err)
+					return
+				}
+			}
 		}
 	}
 }
