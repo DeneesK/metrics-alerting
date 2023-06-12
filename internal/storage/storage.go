@@ -13,8 +13,6 @@ const (
 	thirdAttempt time.Duration = fstAttempt * 5
 )
 
-var readAttempts = []time.Duration{fstAttempt, sndAttempt, thirdAttempt}
-
 type Storage interface {
 	Store(typeMetric string, name string, value interface{}) error
 	StoreBanch(metrics []models.Metrics) error

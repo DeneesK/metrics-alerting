@@ -39,7 +39,8 @@ func NewDBStorage(postgresDSN string, log *zap.SugaredLogger) (*DBStorage, error
 func NewDBSession(postgresDSN string) (*sql.DB, error) {
 	db, err := sql.Open("pgx", postgresDSN)
 	if err != nil {
-		for i, atmp := range readAttempts {
+		conAttempts := []time.Duration{fstAttempt, sndAttempt, thirdAttempt}
+		for i, atmp := range conAttempts {
 			time.Sleep(atmp)
 			db, err = sql.Open("pgx", postgresDSN)
 			if err != nil && i < 2 {

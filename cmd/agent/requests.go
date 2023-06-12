@@ -27,8 +27,6 @@ const (
 	additionalMetricsLen int           = 2
 )
 
-var conAttempts = []time.Duration{fstAttempt, sndAttempt, thirdAttempt}
-
 type Collector interface {
 	StartCollect()
 	GetRuntimeMetrics() metriccollector.RuntimeMetrics
@@ -77,6 +75,7 @@ func sendMetrics(ms Collector, runAddr string) error {
 }
 
 func sendBanch(session *grequests.Session, url string, metrics []models.Metrics) (int, error) {
+	conAttempts := []time.Duration{fstAttempt, sndAttempt, thirdAttempt}
 	res, err := json.Marshal(&metrics)
 	if err != nil {
 		return 0, fmt.Errorf("serialization error - %w", err)

@@ -42,6 +42,7 @@ func NewFileStorage(filePath string, storeInterval int, isRestore bool, log *zap
 	}
 
 	if isRestore {
+		readAttempts := []time.Duration{fstAttempt, sndAttempt, thirdAttempt}
 		if err := fs.loadFromFile(filePath); err != nil {
 			for i, atmp := range readAttempts {
 				time.Sleep(atmp)
@@ -175,8 +176,9 @@ func (storage *FileStorage) save() {
 	for {
 		time.Sleep(storage.storeInterval)
 		if err := storage.saveToFile(storage.filePath); err != nil {
+			saveAttempts := []time.Duration{fstAttempt, sndAttempt, thirdAttempt}
 			storage.log.Debugf("during attempt to store data to file, error occurred: %v", err)
-			for i, atmp := range readAttempts {
+			for i, atmp := range saveAttempts {
 				time.Sleep(atmp)
 				err := storage.saveToFile(storage.filePath)
 				if err != nil && i < 2 {
