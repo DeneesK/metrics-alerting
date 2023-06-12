@@ -22,7 +22,6 @@ func parseFlags() (Conf, error) {
 	flag.StringVar(&conf.runAddr, "a", ":8080", "address and port to run server")
 	flag.StringVar(&conf.logLevel, "l", "debug", "log level")
 	flag.StringVar(&conf.filePath, "f", "tmp/metrics-db.json", "path to store file")
-	// host=localhost user=app password=123QWE dbname=metrics sslmode=disable
 	flag.StringVar(&conf.postgresDSN, "d", "", "database's dsn connection configs")
 	flag.BoolVar(&conf.isRestore, "r", true, "load saved data")
 	flag.IntVar(&conf.storeInterval, "i", 5, "interval of storing data on disk")

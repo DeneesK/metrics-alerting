@@ -32,7 +32,7 @@ type FileStorage struct {
 func NewFileStorage(filePath string, storeInterval int, isRestore bool, log *zap.SugaredLogger) (*FileStorage, error) {
 	ms, err := NewMemStorage(log)
 	if err != nil {
-		return nil, fmt.Errorf("imposible to create new storage - %w", err)
+		return nil, fmt.Errorf("impossible to create new storage - %w", err)
 	}
 	fs := FileStorage{
 		memoryStorage: ms,
