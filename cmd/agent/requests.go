@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"time"
@@ -16,7 +15,7 @@ import (
 )
 
 const (
-	fstAttempt           time.Duration = time.Duration(2) * time.Second
+	fstAttempt           time.Duration = time.Duration(1) * time.Second
 	sndAttempt           time.Duration = fstAttempt * 3
 	thirdAttempt         time.Duration = fstAttempt * 5
 	counterMetric        string        = "counter"
@@ -69,7 +68,7 @@ func sendMetrics(ms Collector, runAddr string) error {
 
 	statusCode, err := sendBanch(session, url, metrics)
 	if err != nil {
-		log.Fatalf("all attempts to establish a connection have been exhausted, during attempts to send data error ocurred - %v, ", err)
+		return fmt.Errorf("all attempts to establish a connection have been exhausted, during attempts to send data error ocurred - %v, ", err)
 	}
 	if statusCode == http.StatusOK {
 		ms.ResetPollCount()
