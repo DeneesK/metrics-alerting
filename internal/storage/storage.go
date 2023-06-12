@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	fstAttempt   time.Duration = time.Duration(0) * time.Second
-	sndAttempt   time.Duration = fstAttempt * 1
-	thirdAttempt time.Duration = fstAttempt * 1
+	fstAttempt   time.Duration = time.Duration(1) * time.Second
+	sndAttempt   time.Duration = fstAttempt * 3
+	thirdAttempt time.Duration = fstAttempt * 5
 )
 
 var readAttempts = []time.Duration{fstAttempt, sndAttempt, thirdAttempt}

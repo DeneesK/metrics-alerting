@@ -14,7 +14,7 @@ import (
 const createTableQuery = `CREATE TABLE IF NOT EXISTS metrics(
 	"metrictype" TEXT NOT NULL,
 	"metricname" TEXT NOT NULL UNIQUE,
-	"counter" INTEGER,
+	"counter" BIGINT,
 	"gauge" DOUBLE PRECISION)`
 
 type DBStorage struct {

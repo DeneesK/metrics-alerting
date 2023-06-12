@@ -3,6 +3,7 @@ package storage
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"time"
@@ -49,7 +50,7 @@ func NewFileStorage(filePath string, storeInterval int, isRestore bool, log *zap
 					continue
 				}
 				if err != nil && i == 2 {
-					ms.log.Debugf("during attempt to load from file, error occurred: %w", err)
+					return nil, fmt.Errorf("during attempt to load from file, error occurred: %w", err)
 				}
 			}
 		}
@@ -120,7 +121,7 @@ func newConsumer(filename string) (*consumer, error) {
 func (c *consumer) readMetrics() (*allMetrics, error) {
 	var data allMetrics
 	err := c.decoder.Decode(&data)
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil, err
 	}
 	return &data, nil
@@ -175,6 +176,17 @@ func (storage *FileStorage) save() {
 		time.Sleep(storage.storeInterval)
 		if err := storage.saveToFile(storage.filePath); err != nil {
 			storage.log.Debugf("during attempt to store data to file, error occurred: %v", err)
+			for i, atmp := range readAttempts {
+				time.Sleep(atmp)
+				err := storage.saveToFile(storage.filePath)
+				if err != nil && i < 2 {
+					continue
+				}
+				if err != nil && i == 2 {
+					storage.log.Fatalf("unable save data to file: %w", err)
+					return
+				}
+			}
 		}
 	}
 }
