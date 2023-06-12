@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	fstAttempt           time.Duration = time.Duration(1) * time.Second
+	fstAttempt           time.Duration = time.Duration(2) * time.Second
 	sndAttempt           time.Duration = fstAttempt * 3
 	thirdAttempt         time.Duration = fstAttempt * 5
 	counterMetric        string        = "counter"
