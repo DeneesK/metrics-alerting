@@ -68,7 +68,7 @@ func sendMetrics(ms Collector, runAddr string) error {
 
 	statusCode, err := sendBanch(session, url, metrics)
 	if err != nil {
-		return fmt.Errorf("all attempts to establish a connection have been exhausted, during attempts to send data error ocurred - %v, ", err)
+		return fmt.Errorf("all attempts to establish a connection have been run out, during attempts to send data error ocurred - %v, ", err)
 	}
 	if statusCode == http.StatusOK {
 		ms.ResetPollCount()
