@@ -42,7 +42,6 @@ func NewFileStorage(filePath string, storeInterval int, isRestore bool, log *zap
 
 	if isRestore {
 		if err := fs.loadFromFile(filePath); err != nil {
-			ms.log.Debugf("during attempt to load from file, error occurred: %w", err)
 			for i, atmp := range readAttempts {
 				time.Sleep(atmp)
 				err := fs.loadFromFile(filePath)
@@ -50,7 +49,7 @@ func NewFileStorage(filePath string, storeInterval int, isRestore bool, log *zap
 					continue
 				}
 				if err != nil && i == 2 {
-					return nil, fmt.Errorf("unable to read file: %w", err)
+					ms.log.Debugf("during attempt to load from file, error occurred: %w", err)
 				}
 			}
 		}
