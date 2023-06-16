@@ -185,19 +185,27 @@ func (storage *DBStorage) insertBatch(ctx context.Context, metrics []models.Metr
 		return err
 	}
 	defer tx.Rollback()
-	values := make(map[string][]interface{}, len(metrics))
+	values := make(map[string]models.Metrics, len(metrics))
 	var valString []string
 	var v []interface{}
 	for _, m := range metrics {
-		values[m.ID] = []interface{}{m.MType, m.ID, m.Delta, m.Value}
+		if old, ok := values[m.ID]; ok && m.MType == counterMetric {
+			fmt.Println("OK")
+			new_delta := *m.Delta + *old.Delta
+			fmt.Println(new_delta)
+			metric := models.Metrics{ID: m.ID, MType: m.MType, Delta: &new_delta, Value: m.Value}
+			values[m.ID] = metric
+			continue
+		}
+		values[m.ID] = m
 	}
 	i := 0
 	for _, m := range values {
 		valString = append(valString, fmt.Sprintf("($%d, $%d, $%d, $%d)", i*4+1, i*4+2, i*4+3, i*4+4))
-		v = append(v, m[0])
-		v = append(v, m[1])
-		v = append(v, m[2])
-		v = append(v, m[3])
+		v = append(v, m.MType)
+		v = append(v, m.ID)
+		v = append(v, m.Delta)
+		v = append(v, m.Value)
 		i++
 	}
 	smt := "INSERT INTO metrics VALUES %s ON CONFLICT (metricname) DO UPDATE SET gauge=EXCLUDED.gauge, counter=metrics.counter+EXCLUDED.counter"
