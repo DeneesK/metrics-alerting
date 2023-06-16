@@ -191,9 +191,9 @@ func (storage *DBStorage) insertBatch(ctx context.Context, metrics []models.Metr
 	for _, m := range metrics {
 		if old, ok := values[m.ID]; ok && m.MType == counterMetric {
 			fmt.Println("OK")
-			new_delta := *m.Delta + *old.Delta
-			fmt.Println(new_delta)
-			metric := models.Metrics{ID: m.ID, MType: m.MType, Delta: &new_delta, Value: m.Value}
+			newDelta := *m.Delta + *old.Delta
+			fmt.Println(newDelta)
+			metric := models.Metrics{ID: m.ID, MType: m.MType, Delta: &newDelta, Value: m.Value}
 			values[m.ID] = metric
 			continue
 		}
