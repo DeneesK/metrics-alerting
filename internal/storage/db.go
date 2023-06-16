@@ -139,6 +139,9 @@ func (storage *DBStorage) GetCounterMetrics() (map[string]int64, error) {
 	if err != nil {
 		return nil, err
 	}
+	if rows.Err() != nil {
+		return nil, err
+	}
 	defer rows.Close()
 	for rows.Next() {
 		err := rows.Scan(&name, &v)
@@ -156,6 +159,9 @@ func (storage *DBStorage) GetGaugeMetrics() (map[string]float64, error) {
 	var v float64
 	rows, err := storage.db.QueryContext(context.Background(), "SELECT metrics.metricname, metrics.gauge FROM metrics WHERE metrics.metrictype=$1", gaugeMetric)
 	if err != nil {
+		return nil, err
+	}
+	if rows.Err() != nil {
 		return nil, err
 	}
 	defer rows.Close()
@@ -179,20 +185,24 @@ func (storage *DBStorage) insertBatch(ctx context.Context, metrics []models.Metr
 		return err
 	}
 	defer tx.Rollback()
-	var values []interface{}
+	values := make(map[string][]interface{}, len(metrics))
 	var valString []string
-	i := 0
+	var v []interface{}
 	for _, m := range metrics {
+		values[m.ID] = []interface{}{m.MType, m.ID, m.Delta, m.Value}
+	}
+	i := 0
+	for _, m := range values {
 		valString = append(valString, fmt.Sprintf("($%d, $%d, $%d, $%d)", i*4+1, i*4+2, i*4+3, i*4+4))
-		values = append(values, m.MType)
-		values = append(values, m.ID)
-		values = append(values, m.Delta)
-		values = append(values, m.Value)
+		v = append(v, m[0])
+		v = append(v, m[1])
+		v = append(v, m[2])
+		v = append(v, m[3])
 		i++
 	}
 	smt := "INSERT INTO metrics VALUES %s ON CONFLICT (metricname) DO UPDATE SET gauge=EXCLUDED.gauge, counter=metrics.counter+EXCLUDED.counter"
 	smt = fmt.Sprintf(smt, strings.Join(valString, ","))
-	_, err = tx.ExecContext(ctx, smt, values...)
+	_, err = tx.ExecContext(ctx, smt, v...)
 	if err != nil {
 		tx.Rollback()
 		return fmt.Errorf("insert batch error: %w", err)
