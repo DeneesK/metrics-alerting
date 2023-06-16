@@ -122,7 +122,7 @@ func (storage *MemStorage) Store(metricType, name string, value interface{}) err
 	}
 }
 
-func (storage *MemStorage) StoreBanch(metrics []models.Metrics) error {
+func (storage *MemStorage) StoreBatch(metrics []models.Metrics) error {
 	for _, m := range metrics {
 		if m.MType == "gauge" {
 			err := storage.Store(m.MType, m.ID, *m.Value)
@@ -158,16 +158,20 @@ func (storage *MemStorage) GetValue(metricType, name string) (Result, bool, erro
 	return Result{0, 0}, false, fmt.Errorf("metric type does not exist, given type: %v", metricType)
 }
 
-func (storage *MemStorage) GetCounterMetrics() map[string]int64 {
-	return storage.counter.LoadAll()
+func (storage *MemStorage) GetCounterMetrics() (map[string]int64, error) {
+	return storage.counter.LoadAll(), nil
 }
 
-func (storage *MemStorage) GetGaugeMetrics() map[string]float64 {
-	return storage.gauge.LoadAll()
+func (storage *MemStorage) GetGaugeMetrics() (map[string]float64, error) {
+	return storage.gauge.LoadAll(), nil
 }
 
-func (storage *MemStorage) Ping() (bool, error) {
-	return true, nil
+func (storage *MemStorage) Ping() error {
+	return nil
+}
+
+func (storage *MemStorage) Close() error {
+	return nil
 }
 
 func (storage *MemStorage) setMetrics(metrics *allMetrics) {

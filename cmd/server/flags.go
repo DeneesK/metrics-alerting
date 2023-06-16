@@ -13,7 +13,7 @@ type Conf struct {
 	storeInterval int
 	filePath      string
 	isRestore     bool
-	postgresDSN   string
+	dsn           string
 }
 
 func parseFlags() (Conf, error) {
@@ -22,7 +22,7 @@ func parseFlags() (Conf, error) {
 	flag.StringVar(&conf.runAddr, "a", ":8080", "address and port to run server")
 	flag.StringVar(&conf.logLevel, "l", "debug", "log level")
 	flag.StringVar(&conf.filePath, "f", "tmp/metrics-db.json", "path to store file")
-	flag.StringVar(&conf.postgresDSN, "d", "", "database's dsn connection configs")
+	flag.StringVar(&conf.dsn, "d", "host=localhost user=app password=123QWE dbname=metrics sslmode=disable", "database's dsn connection configs")
 	flag.BoolVar(&conf.isRestore, "r", true, "load saved data")
 	flag.IntVar(&conf.storeInterval, "i", 5, "interval of storing data on disk")
 	flag.Parse()
@@ -36,7 +36,7 @@ func parseFlags() (Conf, error) {
 		conf.filePath = envFilePath
 	}
 	if envDBDSN, ok := os.LookupEnv("DATABASE_DSN"); ok {
-		conf.postgresDSN = envDBDSN
+		conf.dsn = envDBDSN
 	}
 	if envIsRestore, ok := os.LookupEnv("RESTORE"); ok {
 		envIsRestore, err := strconv.ParseBool(envIsRestore)

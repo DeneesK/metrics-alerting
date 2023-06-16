@@ -70,15 +70,15 @@ func (storage *FileStorage) Store(typeMetric string, name string, value interfac
 	return storage.memoryStorage.Store(typeMetric, name, value)
 }
 
-func (storage *FileStorage) StoreBanch(metrics []models.Metrics) error {
-	return storage.memoryStorage.StoreBanch(metrics)
+func (storage *FileStorage) StoreBatch(metrics []models.Metrics) error {
+	return storage.memoryStorage.StoreBatch(metrics)
 }
 
-func (storage *FileStorage) GetCounterMetrics() map[string]int64 {
+func (storage *FileStorage) GetCounterMetrics() (map[string]int64, error) {
 	return storage.memoryStorage.GetCounterMetrics()
 }
 
-func (storage *FileStorage) GetGaugeMetrics() map[string]float64 {
+func (storage *FileStorage) GetGaugeMetrics() (map[string]float64, error) {
 	return storage.memoryStorage.GetGaugeMetrics()
 }
 
@@ -86,8 +86,12 @@ func (storage *FileStorage) GetValue(typeMetric, name string) (Result, bool, err
 	return storage.memoryStorage.GetValue(typeMetric, name)
 }
 
-func (storage *FileStorage) Ping() (bool, error) {
+func (storage *FileStorage) Ping() error {
 	return storage.memoryStorage.Ping()
+}
+
+func (storage *FileStorage) Close() error {
+	return nil
 }
 
 func newProducer(filename string) (*producer, error) {
@@ -140,9 +144,14 @@ func (storage *FileStorage) saveToFile(path string) error {
 	defer p.close()
 	var metrics allMetrics
 
-	metrics.Counter = storage.memoryStorage.GetCounterMetrics()
-	metrics.Gauge = storage.memoryStorage.GetGaugeMetrics()
-
+	metrics.Counter, err = storage.memoryStorage.GetCounterMetrics()
+	if err != nil {
+		return err
+	}
+	metrics.Gauge, err = storage.memoryStorage.GetGaugeMetrics()
+	if err != nil {
+		return err
+	}
 	return p.writeMetrics(&metrics)
 }
 

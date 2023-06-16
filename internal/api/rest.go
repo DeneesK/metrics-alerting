@@ -19,11 +19,12 @@ const (
 
 type Store interface {
 	Store(typeMetric string, name string, value interface{}) error
-	StoreBanch(metrics []models.Metrics) error
+	StoreBatch(metrics []models.Metrics) error
 	GetValue(typeMetric, name string) (storage.Result, bool, error)
-	GetCounterMetrics() map[string]int64
-	GetGaugeMetrics() map[string]float64
-	Ping() (bool, error)
+	GetCounterMetrics() (map[string]int64, error)
+	GetGaugeMetrics() (map[string]float64, error)
+	Ping() error
+	Close() error
 }
 
 func Routers(ms Store, logging *zap.SugaredLogger) chi.Router {
@@ -48,7 +49,7 @@ func UpdatesJSON(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		if err := storage.StoreBanch(metrics); err != nil {
+		if err := storage.StoreBatch(metrics); err != nil {
 			log.Debugf("during attempt to store banch of data error ocurred: %v", err)
 			res.WriteHeader(http.StatusBadRequest)
 			return
@@ -204,8 +205,18 @@ func Value(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 
 func Metrics(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 	return func(res http.ResponseWriter, _ *http.Request) {
-		c := storage.GetCounterMetrics()
-		g := storage.GetGaugeMetrics()
+		c, err := storage.GetCounterMetrics()
+		if err != nil {
+			log.Debugf("unable load metrics, ocurred error: %v", err)
+			res.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		g, err := storage.GetGaugeMetrics()
+		if err != nil {
+			log.Debugf("unable load metrics, ocurred error: %v", err)
+			res.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 		r := ""
 		for k, v := range c {
 			r += fmt.Sprintf("[%s]: %d\n", k, v)
@@ -221,8 +232,8 @@ func Metrics(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 
 func Ping(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 	return func(res http.ResponseWriter, _ *http.Request) {
-		ok, err := storage.Ping()
-		if !ok && err != nil {
+		err := storage.Ping()
+		if err != nil {
 			res.WriteHeader(http.StatusInternalServerError)
 			log.Debugf("database not available: %v", err)
 			return

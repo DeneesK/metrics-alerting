@@ -4,10 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/DeneesK/metrics-alerting/internal/models"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/sethvargo/go-retry"
 	"go.uber.org/zap"
 )
 
@@ -22,8 +24,8 @@ type DBStorage struct {
 	db  *sql.DB
 }
 
-func NewDBStorage(postgresDSN string, log *zap.SugaredLogger) (*DBStorage, error) {
-	db, err := NewDBSession(postgresDSN)
+func NewDBStorage(dsn string, log *zap.SugaredLogger) (*DBStorage, error) {
+	db, err := NewDBSession(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("during initializing of new db session, error occurred: %w", err)
 	}
@@ -36,30 +38,28 @@ func NewDBStorage(postgresDSN string, log *zap.SugaredLogger) (*DBStorage, error
 	return &DBStorage{log: log, db: db}, nil
 }
 
-func NewDBSession(postgresDSN string) (*sql.DB, error) {
-	db, err := sql.Open("pgx", postgresDSN)
+func NewDBSession(dsn string) (*sql.DB, error) {
+	db, err := sql.Open("pgx", dsn)
 	if err != nil {
-		conAttempts := []time.Duration{fstAttempt, sndAttempt, thirdAttempt}
-		for i, atmp := range conAttempts {
-			time.Sleep(atmp)
-			db, err = sql.Open("pgx", postgresDSN)
-			if err != nil && i < 2 {
-				continue
-			}
-			if err != nil && i == 2 {
-				return nil, fmt.Errorf("unable to connect to db: %w", err)
-			}
-		}
+		return nil, err
 	}
+
+	ctx := context.Background()
+	b := retry.WithMaxRetries(3, retry.NewExponential(1*time.Second))
+	err = retry.Do(ctx, b, try(db))
+	if err != nil {
+		return nil, err
+	}
+
 	return db, nil
 }
 
-func (storage *DBStorage) Ping() (bool, error) {
+func (storage *DBStorage) Ping() error {
 	err := storage.db.Ping()
 	if err != nil {
-		return false, err
+		return err
 	}
-	return true, nil
+	return nil
 }
 
 func (storage *DBStorage) Store(typeMetric string, name string, value interface{}) error {
@@ -88,26 +88,22 @@ func (storage *DBStorage) Store(typeMetric string, name string, value interface{
 	return nil
 }
 
-func (storage *DBStorage) StoreBanch(metrics []models.Metrics) error {
+func (storage *DBStorage) StoreBatch(metrics []models.Metrics) error {
 	ctx := context.Background()
-	if len(metrics) < 1001 {
-		if err := storage.insertBanch(ctx, metrics); err != nil {
-			return fmt.Errorf("postgres db error: %w", err)
-		}
-		return nil
-	}
-	banch := make([]models.Metrics, 0, 1000)
-	for _, m := range metrics {
-		banch = append(banch, m)
-		if len(banch) == 1000 {
-			if err := storage.insertBanch(ctx, metrics); err != nil {
+	start := 0
+	end := 1000
+	for len(metrics) > start {
+		if len(metrics)-end < 0 {
+			if err := storage.insertBatch(ctx, metrics[start:]); err != nil {
 				return fmt.Errorf("postgres db error: %w", err)
 			}
-			banch = banch[:0]
+			break
 		}
-	}
-	if err := storage.insertBanch(ctx, banch); err != nil {
-		return fmt.Errorf("postgres db error: %w", err)
+		if err := storage.insertBatch(ctx, metrics[start:end]); err != nil {
+			return fmt.Errorf("postgres db error: %w", err)
+		}
+		start += 1000
+		end += 1000
 	}
 	return nil
 }
@@ -135,30 +131,71 @@ func (storage *DBStorage) GetValue(typeMetric, name string) (Result, bool, error
 	}
 }
 
-func (storage *DBStorage) GetCounterMetrics() map[string]int64 {
-	return make(map[string]int64, 0)
+func (storage *DBStorage) GetCounterMetrics() (map[string]int64, error) {
+	metrics := make(map[string]int64, 0)
+	var name string
+	var v int64
+	rows, err := storage.db.QueryContext(context.Background(), "SELECT metrics.metricname, metrics.counter FROM metrics WHERE metrics.metrictype=$1", counterMetric)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		err := rows.Scan(&name, &v)
+		if err != nil {
+			return nil, err
+		}
+		metrics[name] = v
+	}
+	return metrics, nil
 }
 
-func (storage *DBStorage) GetGaugeMetrics() map[string]float64 {
-	return make(map[string]float64, 0)
+func (storage *DBStorage) GetGaugeMetrics() (map[string]float64, error) {
+	metrics := make(map[string]float64, 0)
+	var name string
+	var v float64
+	rows, err := storage.db.QueryContext(context.Background(), "SELECT metrics.metricname, metrics.gauge FROM metrics WHERE metrics.metrictype=$1", gaugeMetric)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		err := rows.Scan(&name, &v)
+		if err != nil {
+			return nil, err
+		}
+		metrics[name] = v
+	}
+	return metrics, nil
 }
 
-func (storage *DBStorage) insertBanch(ctx context.Context, metrics []models.Metrics) error {
+func (storage *DBStorage) Close() error {
+	return storage.db.Close()
+}
+
+func (storage *DBStorage) insertBatch(ctx context.Context, metrics []models.Metrics) error {
 	tx, err := storage.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	stmt, err := tx.PrepareContext(ctx, "INSERT INTO metrics VALUES ($1, $2, $3, $4) ON CONFLICT (metricname) DO UPDATE SET gauge=$4, counter=metrics.counter+$3")
-	if err != nil {
-		return fmt.Errorf("insert error: %w", err)
-	}
-	defer stmt.Close()
+	var values []interface{}
+	var valString []string
+	i := 0
 	for _, m := range metrics {
-		_, err := stmt.ExecContext(ctx, m.MType, m.ID, m.Delta, m.Value)
-		if err != nil {
-			return err
-		}
+		valString = append(valString, fmt.Sprintf("($%d, $%d, $%d, $%d)", i*4+1, i*4+2, i*4+3, i*4+4))
+		values = append(values, m.MType)
+		values = append(values, m.ID)
+		values = append(values, m.Delta)
+		values = append(values, m.Value)
+		i++
+	}
+	smt := "INSERT INTO metrics VALUES %s ON CONFLICT (metricname) DO UPDATE SET gauge=EXCLUDED.gauge, counter=metrics.counter+EXCLUDED.counter"
+	smt = fmt.Sprintf(smt, strings.Join(valString, ","))
+	_, err = tx.ExecContext(ctx, smt, values...)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("insert batch error: %w", err)
 	}
 	return tx.Commit()
 }
@@ -169,4 +206,13 @@ func createTable(session *sql.DB) error {
 		return err
 	}
 	return nil
+}
+
+func try(db *sql.DB) func(context.Context) error {
+	return func(ctx context.Context) error {
+		if err := db.PingContext(ctx); err != nil {
+			return retry.RetryableError(err)
+		}
+		return nil
+	}
 }

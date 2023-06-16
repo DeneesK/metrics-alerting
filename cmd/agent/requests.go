@@ -11,13 +11,13 @@ import (
 
 	"github.com/DeneesK/metrics-alerting/internal/models"
 	"github.com/DeneesK/metrics-alerting/internal/services/metriccollector"
-	"github.com/levigross/grequests"
+	"github.com/hashicorp/go-retryablehttp"
 )
 
 const (
-	fstAttempt           time.Duration = time.Duration(1) * time.Second
-	sndAttempt           time.Duration = fstAttempt * 3
-	thirdAttempt         time.Duration = fstAttempt * 5
+	retryMax             int           = 3
+	retryWaitMin         time.Duration = time.Second * 1
+	retryWaitMax         time.Duration = time.Second * 5
 	counterMetric        string        = "counter"
 	gaugeMetric          string        = "gauge"
 	contentType          string        = "application/json"
@@ -45,13 +45,13 @@ func sendMetrics(ms Collector, runAddr string) error {
 	memMetrics := runtimeMetrics.GetMemMetrics()
 	length := len(cpuMetrics) + len(memMetrics) + additionalMetricsLen
 	metrics := make([]models.Metrics, 0, length)
-	ro := grequests.RequestOptions{Headers: map[string]string{
-		"Accept-Encoding":  encodeType,
-		"Content-Encoding": encodeType,
-		"Content-Type":     contentType},
-	}
-	session := grequests.NewSession(&ro)
-	defer session.CloseIdleConnections()
+
+	retryClient := retryablehttp.NewClient()
+
+	retryClient.RetryMax = retryMax
+	retryClient.RetryWaitMin = retryWaitMin
+	retryClient.RetryWaitMax = retryWaitMax
+
 	for k, v := range cpuMetrics {
 		metrics = append(metrics, models.Metrics{ID: k, MType: gaugeMetric, Value: &v})
 	}
@@ -64,9 +64,9 @@ func sendMetrics(ms Collector, runAddr string) error {
 	metrics = append(metrics, models.Metrics{ID: randomValue, MType: gaugeMetric, Value: &randomV})
 	metrics = append(metrics, models.Metrics{ID: pollCount, MType: counterMetric, Delta: &pollC})
 
-	statusCode, err := sendBanch(session, url, metrics)
+	statusCode, err := sendBatch(retryClient, url, metrics)
 	if err != nil {
-		return fmt.Errorf("all attempts to establish a connection have been run out, during attempts to send data error ocurred - %v, ", err)
+		return fmt.Errorf("all attempts to establish the connection have been run out, during attempts to send data error ocurred - %w, ", err)
 	}
 	if statusCode == http.StatusOK {
 		ms.ResetPollCount()
@@ -74,8 +74,7 @@ func sendMetrics(ms Collector, runAddr string) error {
 	return nil
 }
 
-func sendBanch(session *grequests.Session, url string, metrics []models.Metrics) (int, error) {
-	conAttempts := []time.Duration{fstAttempt, sndAttempt, thirdAttempt}
+func sendBatch(retryClient *retryablehttp.Client, url string, metrics []models.Metrics) (int, error) {
 	res, err := json.Marshal(&metrics)
 	if err != nil {
 		return 0, fmt.Errorf("serialization error - %w", err)
@@ -84,21 +83,19 @@ func sendBanch(session *grequests.Session, url string, metrics []models.Metrics)
 	if err != nil {
 		return 0, fmt.Errorf("compressing error - %w", err)
 	}
-	resp, err := session.Post(url, &grequests.RequestOptions{JSON: r})
+	req, err := retryablehttp.NewRequest("POST", url, r)
 	if err != nil {
-		for i, attempt := range conAttempts {
-			time.Sleep(attempt)
-			resp, err := session.Post(url, &grequests.RequestOptions{JSON: r})
-			if err != nil && i < 2 {
-				continue
-			}
-			defer resp.Close()
-			if err != nil && i == 2 {
-				return 0, fmt.Errorf("unable to send report: %w", err)
-			}
-		}
+		return 0, fmt.Errorf("request error - %w", err)
 	}
-	defer resp.Close()
+	req.Header.Add("Accept-Encoding", encodeType)
+	req.Header.Add("Content-Encoding", encodeType)
+	req.Header.Add("Content-Type", contentType)
+	req.Header.Add("Content-Type", contentType)
+	resp, err := retryClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
 	return resp.StatusCode, nil
 }
 

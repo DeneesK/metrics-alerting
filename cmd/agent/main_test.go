@@ -7,13 +7,12 @@ import (
 	"testing"
 
 	"github.com/DeneesK/metrics-alerting/internal/models"
-	"github.com/levigross/grequests"
+	retryablehttp "github.com/hashicorp/go-retryablehttp"
 	"github.com/stretchr/testify/assert"
 )
 
 func Test_postReport(t *testing.T) {
 	v := 10.5
-	metrics := make([]models.Metrics, 0)
 	type args struct {
 		metrics []models.Metrics
 	}
@@ -26,14 +25,17 @@ func Test_postReport(t *testing.T) {
 		{
 			name: "positive test #1",
 			args: args{
-				metrics: append(metrics, models.Metrics{ID: "PollCount", MType: "gauge", Value: &v}),
+				[]models.Metrics{{ID: "PollCount", MType: "gauge", Value: &v}},
 			},
 			wantContentType: "application/json",
 			wantCode:        200,
 		},
 	}
-	ro := grequests.RequestOptions{Headers: map[string]string{"Content-Type": "application/json"}}
-	session := grequests.NewSession(&ro)
+	retryClient := retryablehttp.NewClient()
+	retryClient.RetryMax = retryMax
+	retryClient.RetryWaitMin = retryWaitMin
+	retryClient.RetryWaitMax = retryWaitMax
+
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
@@ -46,7 +48,7 @@ func Test_postReport(t *testing.T) {
 			}))
 			url, err := url.JoinPath(ts.URL, "update")
 			assert.NoError(t, err)
-			statusCode, err := sendBanch(session, url, test.args.metrics)
+			statusCode, err := sendBatch(retryClient, url, test.args.metrics)
 			assert.NoError(t, err)
 			assert.Equal(t, statusCode, test.wantCode)
 			ts.Close()

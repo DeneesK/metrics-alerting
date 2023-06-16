@@ -15,11 +15,12 @@ const (
 
 type Storage interface {
 	Store(typeMetric string, name string, value interface{}) error
-	StoreBanch(metrics []models.Metrics) error
+	StoreBatch(metrics []models.Metrics) error
 	GetValue(typeMetric, name string) (Result, bool, error)
-	GetCounterMetrics() map[string]int64
-	GetGaugeMetrics() map[string]float64
-	Ping() (bool, error)
+	GetCounterMetrics() (map[string]int64, error)
+	GetGaugeMetrics() (map[string]float64, error)
+	Ping() error
+	Close() error
 }
 
 func NewStorage(filePath string, storeInterval int, isRestore bool, log *zap.SugaredLogger, postgresDSN string) (Storage, error) {
