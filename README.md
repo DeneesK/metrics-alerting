@@ -1,32 +1,25 @@
-# go-musthave-metrics-tpl
+# Server for collecting metrics and alerting
 
-Шаблон репозитория для трека «Сервер сбора метрик и алертинга».
+Implemented agent and server
 
-## Начало работы
+### Flags must be specified to run:
 
-1. Склонируйте репозиторий в любую подходящую директорию на вашем компьютере.
-2. В корне репозитория выполните команду `go mod init <name>` (где `<name>` — адрес вашего репозитория на GitHub без префикса `https://`) для создания модуля.
+#### server's flags:
+- `-a` - address and port to run server(default: `localhost:8080`)
+- `-l`- logging level(default: `info`)
+- `-f` - path to store file containing metrics in JSON(default: `tmp/metrics-db.json`)
+- `-r` - load saving data(default: true)
+- `-a` - interval of storing data on disk(default: 5 sec)
+- `-d` - database's dsn connection configs(default: empty)
 
-## Обновление шаблона
+#### agent's flags:
+- `-a` - address and port to run server(default: `localhost:8080`)
+- `-r`- interval of sending metrics to the server(default: 10 sec)
+- `-p` - nterval of polling metrics from the runtime(default: 2 sec)
 
-Чтобы иметь возможность получать обновления автотестов и других частей шаблона, выполните команду:
+The service allows:
+- to collect, store and display metrics
+- set up alerts
 
-```
-git remote add -m main template https://github.com/Yandex-Practicum/go-musthave-metrics-tpl.git
-```
-
-Для обновления кода автотестов выполните команду:
-
-```
-git fetch template && git checkout template/main .github
-```
-
-Затем добавьте полученные изменения в свой репозиторий.
-
-## Запуск автотестов
-
-Для успешного запуска автотестов называйте ветки `iter<number>`, где `<number>` — порядковый номер инкремента. Например, в ветке с названием `iter4` запустятся автотесты для инкрементов с первого по четвёртый.
-
-При мёрже ветки с инкрементом в основную ветку `main` будут запускаться все автотесты.
-
-Подробнее про локальный и автоматический запуск читайте в [README автотестов](https://github.com/Yandex-Practicum/go-autotests).
+What is going to be added:
+- sending notifications under predefined conditions
