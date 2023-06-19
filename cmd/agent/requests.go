@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/DeneesK/metrics-alerting/internal/models"
@@ -79,11 +80,19 @@ func sendBatch(retryClient *retryablehttp.Client, runAddr string, metrics []mode
 	if err != nil {
 		return 0, fmt.Errorf("compressing error - %w", err)
 	}
-	url, err := url.JoinPath("http://", runAddr, "updates", "/")
-	if err != nil {
-		return 0, fmt.Errorf("during attempt to create url error ocurred - %w", err)
+	var u string
+	if strings.Contains(runAddr, "http") {
+		u, err = url.JoinPath(runAddr, "updates", "/")
+		if err != nil {
+			return 0, fmt.Errorf("during attempt to create url error ocurred - %w", err)
+		}
+	} else {
+		u, err = url.JoinPath("http://", runAddr, "updates", "/")
+		if err != nil {
+			return 0, fmt.Errorf("during attempt to create url error ocurred - %w", err)
+		}
 	}
-	req, err := retryablehttp.NewRequest("POST", url, r)
+	req, err := retryablehttp.NewRequest("POST", u, r)
 	if err != nil {
 		return 0, fmt.Errorf("request error - %w", err)
 	}

@@ -14,7 +14,6 @@ func Test_postReport(t *testing.T) {
 	v := 10.5
 	type args struct {
 		metrics []models.Metrics
-		addr    string
 	}
 	tests := []struct {
 		name            string
@@ -26,7 +25,6 @@ func Test_postReport(t *testing.T) {
 			name: "positive test #1",
 			args: args{
 				[]models.Metrics{{ID: "PollCount", MType: "gauge", Value: &v}},
-				"localhost:8080",
 			},
 			wantContentType: "application/json",
 			wantCode:        200,
@@ -47,7 +45,7 @@ func Test_postReport(t *testing.T) {
 				}
 				w.WriteHeader(http.StatusMethodNotAllowed)
 			}))
-			statusCode, err := sendBatch(retryClient, test.args.addr, test.args.metrics)
+			statusCode, err := sendBatch(retryClient, ts.URL, test.args.metrics)
 			assert.NoError(t, err)
 			assert.Equal(t, statusCode, test.wantCode)
 			ts.Close()
