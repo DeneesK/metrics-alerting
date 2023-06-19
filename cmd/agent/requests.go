@@ -7,24 +7,25 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
+	"time"
 
 	"github.com/DeneesK/metrics-alerting/internal/models"
 	"github.com/DeneesK/metrics-alerting/internal/services/metriccollector"
-	"github.com/levigross/grequests"
+	"github.com/hashicorp/go-retryablehttp"
 )
 
 const (
-	counterMetric string = "counter"
-	gaugeMetric   string = "gauge"
-	contentType   string = "application/json"
-	pollCount     string = "PollCount"
-	randomValue   string = "RandomValue"
-	encodeType    string = "gzip"
-)
-
-var (
-	cvalue int64   = 0
-	gvalue float64 = 0
+	retryMax             int           = 3
+	retryWaitMin         time.Duration = time.Second * 1
+	retryWaitMax         time.Duration = time.Second * 5
+	counterMetric        string        = "counter"
+	gaugeMetric          string        = "gauge"
+	contentType          string        = "application/json"
+	pollCount            string        = "PollCount"
+	randomValue          string        = "RandomValue"
+	encodeType           string        = "gzip"
+	additionalMetricsLen int           = 2
 )
 
 type Collector interface {
@@ -36,38 +37,33 @@ type Collector interface {
 }
 
 func sendMetrics(ms Collector, runAddr string) error {
-	url, err := url.JoinPath("http://", runAddr, "update", "/")
-	if err != nil {
-		return fmt.Errorf("during attempt to create url error ocurred - %v", err)
-	}
 	runtimeMetrics := ms.GetRuntimeMetrics()
 	cpuMetrics := runtimeMetrics.GetCPUMetrics()
 	memMetrics := runtimeMetrics.GetMemMetrics()
+	length := len(cpuMetrics) + len(memMetrics) + additionalMetricsLen
+	metrics := make([]models.Metrics, 0, length)
 
-	ro := grequests.RequestOptions{Headers: map[string]string{
-		"Accept-Encoding":  encodeType,
-		"Content-Encoding": encodeType,
-		"Content-Type":     contentType},
-	}
-	session := grequests.NewSession(&ro)
-	defer session.CloseIdleConnections()
+	retryClient := retryablehttp.NewClient()
+	retryClient.RetryMax = retryMax
+	retryClient.RetryWaitMin = retryWaitMin
+	retryClient.RetryWaitMax = retryWaitMax
+	retryClient.Backoff = linearBackoff
 
 	for k, v := range cpuMetrics {
-		if _, err := send(session, url, gaugeMetric, k, v); err != nil {
-			return fmt.Errorf("during attempt to send data error ocurred - %v", err)
-		}
+		metrics = append(metrics, models.Metrics{ID: k, MType: gaugeMetric, Value: &v})
 	}
 	for k, v := range memMetrics {
-		if _, err := send(session, url, gaugeMetric, k, v); err != nil {
-			return fmt.Errorf("during attempt to send data error ocurred - %v", err)
-		}
+		vFloat64 := float64(v)
+		metrics = append(metrics, models.Metrics{ID: k, MType: gaugeMetric, Value: &vFloat64})
 	}
-	if _, err := send(session, url, gaugeMetric, randomValue, ms.GetRandomValue()); err != nil {
-		return err
-	}
-	statusCode, err := send(session, url, counterMetric, pollCount, ms.GetPollCount())
+	randomV := ms.GetRandomValue()
+	pollC := ms.GetPollCount()
+	metrics = append(metrics, models.Metrics{ID: randomValue, MType: gaugeMetric, Value: &randomV})
+	metrics = append(metrics, models.Metrics{ID: pollCount, MType: counterMetric, Delta: &pollC})
+
+	statusCode, err := sendBatch(retryClient, runAddr, metrics)
 	if err != nil {
-		return fmt.Errorf("during attempt to send data error ocurred - %v", err)
+		return fmt.Errorf("all attempts to establish the connection have been run out, during attempts to send data error ocurred - %w, ", err)
 	}
 	if statusCode == http.StatusOK {
 		ms.ResetPollCount()
@@ -75,45 +71,40 @@ func sendMetrics(ms Collector, runAddr string) error {
 	return nil
 }
 
-func send(session *grequests.Session, url string, metricType string, metricName string, value interface{}) (int, error) {
-	m := models.Metrics{Delta: &cvalue, Value: &gvalue}
-	m.ID = metricName
-	m.MType = metricType
-	switch metricType {
-	case "counter":
-		switch t := value.(type) {
-		case uint64:
-			*m.Delta = int64(value.(uint64))
-		case int64:
-			*m.Delta = value.(int64)
-		default:
-			return 0, fmt.Errorf("unable to send report, counter value must be uint64 or int64, have - %v", t)
-		}
-	case "gauge":
-		switch t := value.(type) {
-		case uint64:
-			*m.Value = float64(value.(uint64))
-		case float64:
-			*m.Value = value.(float64)
-		default:
-			return 0, fmt.Errorf("unable to send report, gauge value must be uint64 or float64, have - %v", t)
-		}
-	default:
-		return 0, fmt.Errorf("unable to send report, metricType must be counter or gauge, have - %v", metricType)
-	}
-	res, err := json.Marshal(&m)
+func sendBatch(retryClient *retryablehttp.Client, runAddr string, metrics []models.Metrics) (int, error) {
+	res, err := json.Marshal(&metrics)
 	if err != nil {
-		return 0, fmt.Errorf("serialisation error - %v", err)
+		return 0, fmt.Errorf("serialization error - %w", err)
 	}
 	r, err := compress(res)
 	if err != nil {
-		return 0, fmt.Errorf("compressing error - %v", err)
+		return 0, fmt.Errorf("compressing error - %w", err)
 	}
-	resp, err := session.Post(url, &grequests.RequestOptions{JSON: r})
+	var u string
+	if strings.Contains(runAddr, "http") {
+		u, err = url.JoinPath(runAddr, "updates", "/")
+		if err != nil {
+			return 0, fmt.Errorf("during attempt to create url error ocurred - %w", err)
+		}
+	} else {
+		u, err = url.JoinPath("http://", runAddr, "updates", "/")
+		if err != nil {
+			return 0, fmt.Errorf("during attempt to create url error ocurred - %w", err)
+		}
+	}
+	req, err := retryablehttp.NewRequest("POST", u, r)
 	if err != nil {
-		return 0, fmt.Errorf("unable to send report: %w", err)
+		return 0, fmt.Errorf("request error - %w", err)
 	}
-	defer resp.Close()
+	req.Header.Add("Accept-Encoding", encodeType)
+	req.Header.Add("Content-Encoding", encodeType)
+	req.Header.Add("Content-Type", contentType)
+	req.Header.Add("Content-Type", contentType)
+	resp, err := retryClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
 	return resp.StatusCode, nil
 }
 
@@ -132,4 +123,10 @@ func compress(b []byte) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// provides a linear sequence in 2 sec steps (1,3,5)
+func linearBackoff(min, max time.Duration, attemptNum int, resp *http.Response) time.Duration {
+	sleepTime := min + min*time.Duration(2*attemptNum)
+	return sleepTime
 }

@@ -3,19 +3,17 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"testing"
 
-	"github.com/levigross/grequests"
+	"github.com/DeneesK/metrics-alerting/internal/models"
+	"github.com/hashicorp/go-retryablehttp"
 	"github.com/stretchr/testify/assert"
 )
 
 func Test_postReport(t *testing.T) {
+	v := 10.5
 	type args struct {
-		contentType string
-		metricType  string
-		metricName  string
-		delta       uint64
+		metrics []models.Metrics
 	}
 	tests := []struct {
 		name            string
@@ -26,17 +24,17 @@ func Test_postReport(t *testing.T) {
 		{
 			name: "positive test #1",
 			args: args{
-				contentType: "application/json",
-				metricType:  "counter",
-				metricName:  "metric",
-				delta:       10,
+				[]models.Metrics{{ID: "PollCount", MType: "gauge", Value: &v}},
 			},
 			wantContentType: "application/json",
 			wantCode:        200,
 		},
 	}
-	ro := grequests.RequestOptions{Headers: map[string]string{"Content-Type": "application/json"}}
-	session := grequests.NewSession(&ro)
+	retryClient := retryablehttp.NewClient()
+	retryClient.RetryMax = retryMax
+	retryClient.RetryWaitMin = retryWaitMin
+	retryClient.RetryWaitMax = retryWaitMax
+
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
@@ -47,9 +45,7 @@ func Test_postReport(t *testing.T) {
 				}
 				w.WriteHeader(http.StatusMethodNotAllowed)
 			}))
-			url, err := url.JoinPath(ts.URL, "update")
-			assert.NoError(t, err)
-			statusCode, err := send(session, url, test.args.metricType, test.args.metricName, test.args.delta)
+			statusCode, err := sendBatch(retryClient, ts.URL, test.args.metrics)
 			assert.NoError(t, err)
 			assert.Equal(t, statusCode, test.wantCode)
 			ts.Close()
