@@ -182,18 +182,12 @@ func (storage *FileStorage) save() {
 	for {
 		time.Sleep(storage.storeInterval)
 		if err := storage.saveToFile(storage.filePath); err != nil {
-			saveAttempts := []time.Duration{fstAttempt, sndAttempt, thirdAttempt}
 			storage.log.Debugf("during attempt to store data to file, error occurred: %v", err)
-			for i, atmp := range saveAttempts {
-				time.Sleep(atmp)
-				err := storage.saveToFile(storage.filePath)
-				if err != nil && i < 2 {
-					continue
-				}
-				if err != nil && i == 2 {
-					storage.log.Fatalf("unable save data to file: %w", err)
-					return
-				}
+			ctx := context.Background()
+			b := retry.WithMaxRetries(3, NewlinearBackoff(time.Second*1))
+			err = retry.Do(ctx, b, trySaveFile(storage))
+			if err != nil {
+				storage.log.Fatalf("unable to load metrics from file - %w", err)
 			}
 		}
 	}
@@ -202,6 +196,15 @@ func (storage *FileStorage) save() {
 func tryLoadFile(filePath string, fs *FileStorage) func(context.Context) error {
 	return func(ctx context.Context) error {
 		if err := fs.loadFromFile(filePath); err != nil {
+			return retry.RetryableError(err)
+		}
+		return nil
+	}
+}
+
+func trySaveFile(fs *FileStorage) func(context.Context) error {
+	return func(ctx context.Context) error {
+		if err := fs.saveToFile(fs.filePath); err != nil {
 			return retry.RetryableError(err)
 		}
 		return nil

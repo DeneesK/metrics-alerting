@@ -1,16 +1,8 @@
 package storage
 
 import (
-	"time"
-
 	"github.com/DeneesK/metrics-alerting/internal/models"
 	"go.uber.org/zap"
-)
-
-const (
-	fstAttempt   time.Duration = time.Duration(1) * time.Second
-	sndAttempt   time.Duration = fstAttempt * 3
-	thirdAttempt time.Duration = fstAttempt * 5
 )
 
 type Storage interface {
