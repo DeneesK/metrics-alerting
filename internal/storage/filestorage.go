@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/DeneesK/metrics-alerting/internal/models"
+	"github.com/sethvargo/go-retry"
 	"go.uber.org/zap"
 )
 
@@ -42,17 +44,12 @@ func NewFileStorage(filePath string, storeInterval int, isRestore bool, log *zap
 	}
 
 	if isRestore {
-		readAttempts := []time.Duration{fstAttempt, sndAttempt, thirdAttempt}
 		if err := fs.loadFromFile(filePath); err != nil {
-			for i, atmp := range readAttempts {
-				time.Sleep(atmp)
-				err := fs.loadFromFile(filePath)
-				if err != nil && i < 2 {
-					continue
-				}
-				if err != nil && i == 2 {
-					return nil, fmt.Errorf("during attempt to load from file, error occurred: %w", err)
-				}
+			ctx := context.Background()
+			b := retry.WithMaxRetries(3, NewlinearBackoff(time.Second*1))
+			err = retry.Do(ctx, b, tryLoadFile(filePath, &fs))
+			if err != nil {
+				return nil, fmt.Errorf("unable to load metrics from file - %w", err)
 			}
 		}
 	}
@@ -199,5 +196,14 @@ func (storage *FileStorage) save() {
 				}
 			}
 		}
+	}
+}
+
+func tryLoadFile(filePath string, fs *FileStorage) func(context.Context) error {
+	return func(ctx context.Context) error {
+		if err := fs.loadFromFile(filePath); err != nil {
+			return retry.RetryableError(err)
+		}
+		return nil
 	}
 }

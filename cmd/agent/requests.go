@@ -36,10 +36,6 @@ type Collector interface {
 }
 
 func sendMetrics(ms Collector, runAddr string) error {
-	url, err := url.JoinPath("http://", runAddr, "updates", "/")
-	if err != nil {
-		return fmt.Errorf("during attempt to create url error ocurred - %w", err)
-	}
 	runtimeMetrics := ms.GetRuntimeMetrics()
 	cpuMetrics := runtimeMetrics.GetCPUMetrics()
 	memMetrics := runtimeMetrics.GetMemMetrics()
@@ -47,10 +43,10 @@ func sendMetrics(ms Collector, runAddr string) error {
 	metrics := make([]models.Metrics, 0, length)
 
 	retryClient := retryablehttp.NewClient()
-
 	retryClient.RetryMax = retryMax
 	retryClient.RetryWaitMin = retryWaitMin
 	retryClient.RetryWaitMax = retryWaitMax
+	retryClient.Backoff = linearBackoff
 
 	for k, v := range cpuMetrics {
 		metrics = append(metrics, models.Metrics{ID: k, MType: gaugeMetric, Value: &v})
@@ -64,7 +60,7 @@ func sendMetrics(ms Collector, runAddr string) error {
 	metrics = append(metrics, models.Metrics{ID: randomValue, MType: gaugeMetric, Value: &randomV})
 	metrics = append(metrics, models.Metrics{ID: pollCount, MType: counterMetric, Delta: &pollC})
 
-	statusCode, err := sendBatch(retryClient, url, metrics)
+	statusCode, err := sendBatch(retryClient, runAddr, metrics)
 	if err != nil {
 		return fmt.Errorf("all attempts to establish the connection have been run out, during attempts to send data error ocurred - %w, ", err)
 	}
@@ -74,7 +70,7 @@ func sendMetrics(ms Collector, runAddr string) error {
 	return nil
 }
 
-func sendBatch(retryClient *retryablehttp.Client, url string, metrics []models.Metrics) (int, error) {
+func sendBatch(retryClient *retryablehttp.Client, runAddr string, metrics []models.Metrics) (int, error) {
 	res, err := json.Marshal(&metrics)
 	if err != nil {
 		return 0, fmt.Errorf("serialization error - %w", err)
@@ -82,6 +78,10 @@ func sendBatch(retryClient *retryablehttp.Client, url string, metrics []models.M
 	r, err := compress(res)
 	if err != nil {
 		return 0, fmt.Errorf("compressing error - %w", err)
+	}
+	url, err := url.JoinPath("http://", runAddr, "updates", "/")
+	if err != nil {
+		return 0, fmt.Errorf("during attempt to create url error ocurred - %w", err)
 	}
 	req, err := retryablehttp.NewRequest("POST", url, r)
 	if err != nil {
@@ -114,4 +114,10 @@ func compress(b []byte) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// provides a linear sequence in 2 sec steps (1,3,5)
+func linearBackoff(min, max time.Duration, attemptNum int, resp *http.Response) time.Duration {
+	sleepTime := min + min*time.Duration(2*attemptNum)
+	return sleepTime
 }

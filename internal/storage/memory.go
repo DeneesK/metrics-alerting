@@ -124,16 +124,18 @@ func (storage *MemStorage) Store(metricType, name string, value interface{}) err
 
 func (storage *MemStorage) StoreBatch(metrics []models.Metrics) error {
 	for _, m := range metrics {
-		if m.MType == "gauge" {
+		if m.MType == "gauge" && m.Value != nil {
 			err := storage.Store(m.MType, m.ID, *m.Value)
 			if err != nil {
-				return fmt.Errorf("store banch to memory failed with error: %v", err)
+				return fmt.Errorf("store batch to memory failed with error: %w", err)
 			}
-		} else {
+		} else if m.MType == "counter" && m.Delta != nil {
 			err := storage.Store(m.MType, m.ID, *m.Delta)
 			if err != nil {
-				return fmt.Errorf("store banch to memory failed with error: %v", err)
+				return fmt.Errorf("store batch to memory failed with error: %w", err)
 			}
+		} else {
+			return fmt.Errorf("attempt to store batch to memory failed, value - %v, delta - %v, metrictype - %v", m.Value, m.ID, m.MType)
 		}
 
 	}

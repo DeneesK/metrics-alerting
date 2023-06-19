@@ -41,14 +41,13 @@ func NewDBStorage(dsn string, log *zap.SugaredLogger) (*DBStorage, error) {
 func NewDBSession(dsn string) (*sql.DB, error) {
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("attempt to establish connection failed - %w", err)
 	}
-
 	ctx := context.Background()
-	b := retry.WithMaxRetries(3, retry.NewExponential(1*time.Second))
-	err = retry.Do(ctx, b, try(db))
+	b := retry.WithMaxRetries(3, NewlinearBackoff(time.Second*1))
+	err = retry.Do(ctx, b, tryPingDB(db))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("database is not available - %w", err)
 	}
 
 	return db, nil
@@ -57,7 +56,7 @@ func NewDBSession(dsn string) (*sql.DB, error) {
 func (storage *DBStorage) Ping() error {
 	err := storage.db.Ping()
 	if err != nil {
-		return err
+		return fmt.Errorf("database is not available - %w", err)
 	}
 	return nil
 }
@@ -67,7 +66,7 @@ func (storage *DBStorage) Store(typeMetric string, name string, value interface{
 	case counterMetric:
 		v, ok := value.(int64)
 		if !ok {
-			return fmt.Errorf("value cannot be cast to a specific type")
+			return fmt.Errorf("value cannot be cast to integer,  value - %v", value)
 		}
 		_, err := storage.db.Exec("INSERT INTO metrics VALUES ($1, $2, $3, $4) ON CONFLICT (metricname) DO UPDATE SET counter=metrics.counter+$3", counterMetric, name, v, 0)
 		if err != nil {
@@ -76,11 +75,11 @@ func (storage *DBStorage) Store(typeMetric string, name string, value interface{
 	case gaugeMetric:
 		v, ok := value.(float64)
 		if !ok {
-			return fmt.Errorf("value cannot be cast to a specific type")
+			return fmt.Errorf("value cannot be cast to integer,  value - %v", value)
 		}
 		_, err := storage.db.Exec("INSERT INTO metrics VALUES ($1, $2, $3, $4) ON CONFLICT (metricname) DO UPDATE SET gauge=$4", gaugeMetric, name, 0, v)
 		if err != nil {
-			return err
+			return fmt.Errorf("insert failed - %w", err)
 		}
 	default:
 		return fmt.Errorf("metric type does not exist, given type: %v", typeMetric)
@@ -115,7 +114,7 @@ func (storage *DBStorage) GetValue(typeMetric, name string) (Result, bool, error
 		row := storage.db.QueryRowContext(context.Background(), "SELECT metrics.counter FROM metrics WHERE metrics.MetricName=$1", name)
 		err := row.Scan(&value)
 		if err != nil {
-			return Result{}, false, err
+			return Result{}, false, fmt.Errorf("query failed - %w", err)
 		}
 		return Result{Counter: value, Gauge: 0}, true, nil
 	case gaugeMetric:
@@ -123,7 +122,7 @@ func (storage *DBStorage) GetValue(typeMetric, name string) (Result, bool, error
 		row := storage.db.QueryRowContext(context.Background(), "SELECT metrics.gauge FROM metrics WHERE metrics.MetricName=$1", name)
 		err := row.Scan(&value)
 		if err != nil {
-			return Result{}, false, err
+			return Result{}, false, fmt.Errorf("query failed - %w", err)
 		}
 		return Result{Counter: 0, Gauge: value}, true, nil
 	default:
@@ -137,16 +136,16 @@ func (storage *DBStorage) GetCounterMetrics() (map[string]int64, error) {
 	var v int64
 	rows, err := storage.db.QueryContext(context.Background(), "SELECT metrics.metricname, metrics.counter FROM metrics WHERE metrics.metrictype=$1", counterMetric)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query failed - %w", err)
 	}
 	if rows.Err() != nil {
-		return nil, err
+		return nil, fmt.Errorf("row returned error - %w", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
 		err := rows.Scan(&name, &v)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("during attempt to scan rows error ocurred - %v", err)
 		}
 		metrics[name] = v
 	}
@@ -159,16 +158,16 @@ func (storage *DBStorage) GetGaugeMetrics() (map[string]float64, error) {
 	var v float64
 	rows, err := storage.db.QueryContext(context.Background(), "SELECT metrics.metricname, metrics.gauge FROM metrics WHERE metrics.metrictype=$1", gaugeMetric)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query failed - %w", err)
 	}
 	if rows.Err() != nil {
-		return nil, err
+		return nil, fmt.Errorf("row returned error - %w", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
 		err := rows.Scan(&name, &v)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("during attempt to scan rows error ocurred - %w", err)
 		}
 		metrics[name] = v
 	}
@@ -182,7 +181,7 @@ func (storage *DBStorage) Close() error {
 func (storage *DBStorage) insertBatch(ctx context.Context, metrics []models.Metrics) error {
 	tx, err := storage.db.Begin()
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to start transaction an error occurred - %w", err)
 	}
 	defer tx.Rollback()
 	values := make(map[string]models.Metrics, len(metrics))
@@ -190,9 +189,7 @@ func (storage *DBStorage) insertBatch(ctx context.Context, metrics []models.Metr
 	var v []interface{}
 	for _, m := range metrics {
 		if old, ok := values[m.ID]; ok && m.MType == counterMetric {
-			fmt.Println("OK")
 			newDelta := *m.Delta + *old.Delta
-			fmt.Println(newDelta)
 			metric := models.Metrics{ID: m.ID, MType: m.MType, Delta: &newDelta, Value: m.Value}
 			values[m.ID] = metric
 			continue
@@ -221,12 +218,12 @@ func (storage *DBStorage) insertBatch(ctx context.Context, metrics []models.Metr
 func createTable(session *sql.DB) error {
 	_, err := session.Exec(createTableQuery)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to create table an error occurred - %w", err)
 	}
 	return nil
 }
 
-func try(db *sql.DB) func(context.Context) error {
+func tryPingDB(db *sql.DB) func(context.Context) error {
 	return func(ctx context.Context) error {
 		if err := db.PingContext(ctx); err != nil {
 			return retry.RetryableError(err)
