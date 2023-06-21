@@ -1,8 +1,14 @@
 package api
 
 import (
+	"bytes"
 	"compress/gzip"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"io"
+
 	"net/http"
 	"strings"
 	"time"
@@ -129,4 +135,43 @@ func withLogging(log *zap.SugaredLogger) func(http.Handler) http.Handler {
 			)
 		})
 	}
+}
+
+func checkHash(log *zap.SugaredLogger, key string) func(http.Handler) http.Handler {
+	return func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			bodyBytes, err := io.ReadAll(req.Body)
+			if err != nil {
+				log.Errorf("during reading body error ocurred - %w", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			req.Body.Close()
+			hs, err := calculateHash(bodyBytes, key)
+			if err != nil {
+				log.Errorf("hash calculation failed - %w", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			ha := req.Header.Get("HashSHA256")
+
+			if strings.Compare(hs, ha) != 0 {
+				log.Errorf("hashes must be equal - %w", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+			h.ServeHTTP(w, req)
+		})
+	}
+}
+
+func calculateHash(data []byte, hashKey string) (string, error) {
+	h := hmac.New(sha256.New, []byte(hashKey))
+	_, err := h.Write(data)
+	if err != nil {
+		return "", fmt.Errorf("didn't come up with %w", err)
+	}
+	hs := hex.EncodeToString(h.Sum(nil))
+	return hs, nil
 }

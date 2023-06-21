@@ -18,7 +18,7 @@ func main() {
 	log.Printf("client started sending data on %s", conf.runAddr)
 
 	for {
-		if err := sendMetrics(&ms, conf.runAddr); err != nil {
+		if err := sendMetrics(&ms, conf.runAddr, conf.hashKey); err != nil {
 			log.Println(err)
 		}
 		time.Sleep(reportInterval)

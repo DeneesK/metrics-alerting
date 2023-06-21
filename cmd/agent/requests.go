@@ -3,6 +3,9 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -36,7 +39,7 @@ type Collector interface {
 	ResetPollCount()
 }
 
-func sendMetrics(ms Collector, runAddr string) error {
+func sendMetrics(ms Collector, runAddr string, hashKey string) error {
 	runtimeMetrics := ms.GetRuntimeMetrics()
 	cpuMetrics := runtimeMetrics.GetCPUMetrics()
 	memMetrics := runtimeMetrics.GetMemMetrics()
@@ -61,7 +64,7 @@ func sendMetrics(ms Collector, runAddr string) error {
 	metrics = append(metrics, models.Metrics{ID: randomValue, MType: gaugeMetric, Value: &randomV})
 	metrics = append(metrics, models.Metrics{ID: pollCount, MType: counterMetric, Delta: &pollC})
 
-	statusCode, err := sendBatch(retryClient, runAddr, metrics)
+	statusCode, err := sendBatch(retryClient, runAddr, metrics, hashKey)
 	if err != nil {
 		return fmt.Errorf("all attempts to establish the connection have been run out, during attempts to send data error ocurred - %w, ", err)
 	}
@@ -71,10 +74,15 @@ func sendMetrics(ms Collector, runAddr string) error {
 	return nil
 }
 
-func sendBatch(retryClient *retryablehttp.Client, runAddr string, metrics []models.Metrics) (int, error) {
+func sendBatch(retryClient *retryablehttp.Client, runAddr string, metrics []models.Metrics, hashKey string) (int, error) {
 	res, err := json.Marshal(&metrics)
 	if err != nil {
 		return 0, fmt.Errorf("serialization error - %w", err)
+	}
+
+	hsh, err := calculateHash(res, hashKey)
+	if err != nil {
+		return 0, fmt.Errorf("hash calculation failed with error - %w", err)
 	}
 	r, err := compress(res)
 	if err != nil {
@@ -100,6 +108,7 @@ func sendBatch(retryClient *retryablehttp.Client, runAddr string, metrics []mode
 	req.Header.Add("Content-Encoding", encodeType)
 	req.Header.Add("Content-Type", contentType)
 	req.Header.Add("Content-Type", contentType)
+	req.Header.Add("HashSHA256", hsh)
 	resp, err := retryClient.Do(req)
 	if err != nil {
 		return 0, err
@@ -126,7 +135,17 @@ func compress(b []byte) ([]byte, error) {
 }
 
 // provides a linear sequence in 2 sec steps (1,3,5)
-func linearBackoff(min, max time.Duration, attemptNum int, resp *http.Response) time.Duration {
+func linearBackoff(min, _ time.Duration, attemptNum int, _ *http.Response) time.Duration {
 	sleepTime := min + min*time.Duration(2*attemptNum)
 	return sleepTime
+}
+
+func calculateHash(data []byte, hashKey string) (string, error) {
+	h := hmac.New(sha256.New, []byte(hashKey))
+	_, err := h.Write(data)
+	if err != nil {
+		return "", fmt.Errorf("didn't come up with %w", err)
+	}
+	hs := hex.EncodeToString(h.Sum(nil))
+	return hs, nil
 }
