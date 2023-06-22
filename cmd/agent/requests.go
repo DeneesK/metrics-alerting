@@ -79,11 +79,6 @@ func sendBatch(retryClient *retryablehttp.Client, runAddr string, metrics []mode
 	if err != nil {
 		return 0, fmt.Errorf("serialization error - %w", err)
 	}
-
-	hsh, err := calculateHash(res, hashKey)
-	if err != nil {
-		return 0, fmt.Errorf("hash calculation failed with error - %w", err)
-	}
 	r, err := compress(res)
 	if err != nil {
 		return 0, fmt.Errorf("compressing error - %w", err)
@@ -104,11 +99,18 @@ func sendBatch(retryClient *retryablehttp.Client, runAddr string, metrics []mode
 	if err != nil {
 		return 0, fmt.Errorf("request error - %w", err)
 	}
+	var hsh string
+	if hashKey != "" {
+		hsh, err = calculateHash(r, hashKey)
+		req.Header.Add("HashSHA256", hsh)
+		if err != nil {
+			return 0, fmt.Errorf("hash calculation failed with error - %w", err)
+		}
+	}
 	req.Header.Add("Accept-Encoding", encodeType)
 	req.Header.Add("Content-Encoding", encodeType)
 	req.Header.Add("Content-Type", contentType)
 	req.Header.Add("Content-Type", contentType)
-	req.Header.Add("HashSHA256", hsh)
 	resp, err := retryClient.Do(req)
 	if err != nil {
 		return 0, err

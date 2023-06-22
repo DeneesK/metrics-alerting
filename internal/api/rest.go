@@ -29,11 +29,11 @@ type Store interface {
 
 func Routers(ms Store, logging *zap.SugaredLogger, key string) chi.Router {
 	r := chi.NewRouter()
-	r.Use(withLogging(logging))
-	r.Use(gzipMiddleware(logging))
 	if key != "" {
 		r.Use(checkHash(logging, key))
 	}
+	r.Use(withLogging(logging))
+	r.Use(gzipMiddleware(logging))
 	r.Post("/update/", UpdateJSON(ms, logging))
 	r.Post("/updates/", UpdatesJSON(ms, logging))
 	r.Post("/value/", ValueJSON(ms, logging))

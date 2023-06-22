@@ -17,7 +17,7 @@ type Conf struct {
 func parseFlags() (Conf, error) {
 	var conf Conf
 	flag.StringVar(&conf.runAddr, "a", "localhost:8080", "address and port to run server")
-	flag.StringVar(&conf.hashKey, "k", "secret", "the key to calculate hash")
+	flag.StringVar(&conf.hashKey, "k", "", "the key to calculate hash")
 	flag.IntVar(&conf.reportingInterval, "r", 10, "interval of sending metrics to the server")
 	flag.IntVar(&conf.pollingInterval, "p", 2, "interval of polling metrics from the runtime package")
 	flag.Parse()
