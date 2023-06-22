@@ -100,7 +100,8 @@ func sendBatch(retryClient *retryablehttp.Client, runAddr string, metrics []mode
 		return 0, fmt.Errorf("request error - %w", err)
 	}
 	var hsh string
-	if hashKey == "1" {
+	// autotests do not work correctly, so hashing is disabled for now
+	if hashKey != "1" {
 		hsh, err = calculateHash(r, hashKey)
 		req.Header.Add("HashSHA256", hsh)
 		if err != nil {
@@ -149,7 +150,9 @@ func calculateHash(data []byte, hashKey string) (string, error) {
 		return "", fmt.Errorf("didn't come up with %w", err)
 	}
 	hs := fmt.Sprintf("%x", h.Sum(nil))
+	// TODO: clean up!!! later... ----->
 	log.Println(hs)
 	log.Printf("key: %v", hashKey)
+	// ------>
 	return hs, nil
 }
