@@ -20,10 +20,10 @@ import (
 func routerWithoutMiddlewares(ms storage.Storage, logging *zap.SugaredLogger) chi.Router {
 	r := chi.NewRouter()
 	r.Post("/update/{metricType}/{metricName}/{value}", api.Update(ms, logging))
-	r.Get("/value/{metricType}/{metricName}", api.Value(ms, logging))
-	r.Post("/update/", api.UpdateJSON(ms, logging))
-	r.Post("/value/", api.ValueJSON(ms, logging))
-	r.Get("/", api.Metrics(ms, logging))
+	r.Get("/value/{metricType}/{metricName}", api.Value(ms, logging, ""))
+	r.Post("/update/", api.UpdateJSON(ms, logging, ""))
+	r.Post("/value/", api.ValueJSON(ms, logging, ""))
+	r.Get("/", api.Metrics(ms, logging, ""))
 	return r
 }
 
