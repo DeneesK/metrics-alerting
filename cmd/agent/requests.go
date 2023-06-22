@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -148,5 +149,6 @@ func calculateHash(data []byte, hashKey string) (string, error) {
 		return "", fmt.Errorf("didn't come up with %w", err)
 	}
 	hs := fmt.Sprintf("%x", h.Sum(nil))
+	log.Println(hs)
 	return hs, nil
 }

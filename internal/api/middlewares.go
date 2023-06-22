@@ -153,7 +153,8 @@ func checkHash(log *zap.SugaredLogger, key string) func(http.Handler) http.Handl
 				return
 			}
 			ha := req.Header.Get("HashSHA256")
-
+			log.Debug(ha)
+			log.Debug(hs)
 			if strings.Compare(hs, ha) != 0 {
 				log.Errorf("hashes must be equal - %w", err)
 				w.WriteHeader(http.StatusBadRequest)
