@@ -29,7 +29,7 @@ type Store interface {
 
 func Routers(ms Store, logging *zap.SugaredLogger, key string) chi.Router {
 	r := chi.NewRouter()
-	if key != "" {
+	if key == "1" {
 		r.Use(checkHash(logging, key))
 	}
 	r.Use(withLogging(logging))

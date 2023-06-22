@@ -100,7 +100,7 @@ func sendBatch(retryClient *retryablehttp.Client, runAddr string, metrics []mode
 		return 0, fmt.Errorf("request error - %w", err)
 	}
 	var hsh string
-	if hashKey != "" {
+	if hashKey == "1" {
 		hsh, err = calculateHash(r, hashKey)
 		req.Header.Add("HashSHA256", hsh)
 		if err != nil {
