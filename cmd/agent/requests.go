@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -148,6 +147,6 @@ func calculateHash(data []byte, hashKey string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("didn't come up with %w", err)
 	}
-	hs := hex.EncodeToString(h.Sum(nil))
+	hs := fmt.Sprintf("%x", h.Sum(nil))
 	return hs, nil
 }
