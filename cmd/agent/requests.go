@@ -150,5 +150,6 @@ func calculateHash(data []byte, hashKey string) (string, error) {
 	}
 	hs := fmt.Sprintf("%x", h.Sum(nil))
 	log.Println(hs)
+	log.Printf("key: %v", hashKey)
 	return hs, nil
 }
