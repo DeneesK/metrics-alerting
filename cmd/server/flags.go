@@ -24,7 +24,7 @@ func parseFlags() (Conf, error) {
 	flag.StringVar(&conf.logLevel, "l", "debug", "log level")
 	flag.StringVar(&conf.filePath, "f", "tmp/metrics-db.json", "path to store file")
 	flag.StringVar(&conf.dsn, "d", "", "database's dsn connection configs")
-	flag.StringVar(&conf.hashKey, "k", "s", "the key to calculate hash")
+	flag.StringVar(&conf.hashKey, "k", "", "the key to calculate hash")
 	flag.BoolVar(&conf.isRestore, "r", true, "load saved data")
 	flag.IntVar(&conf.storeInterval, "i", 5, "interval of storing data on disk")
 	flag.Parse()
