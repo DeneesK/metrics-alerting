@@ -12,6 +12,7 @@ type Conf struct {
 	hashKey           string
 	reportingInterval int
 	pollingInterval   int
+	rateLimit         int
 }
 
 func parseFlags() (Conf, error) {
@@ -20,6 +21,7 @@ func parseFlags() (Conf, error) {
 	flag.StringVar(&conf.hashKey, "k", "", "the key to calculate hash")
 	flag.IntVar(&conf.reportingInterval, "r", 10, "interval of sending metrics to the server")
 	flag.IntVar(&conf.pollingInterval, "p", 2, "interval of polling metrics from the runtime package")
+	flag.IntVar(&conf.rateLimit, "l", 1, "number of outgoing requests to the server at the same time")
 	flag.Parse()
 	if envRunAddr, ok := os.LookupEnv("ADDRESS"); ok {
 		conf.runAddr = envRunAddr
@@ -33,6 +35,13 @@ func parseFlags() (Conf, error) {
 			return Conf{}, fmt.Errorf("value of REPORT_INTERVAL is not a integer: %w", err)
 		}
 		conf.reportingInterval = fri
+	}
+	if envrateLimit, ok := os.LookupEnv("RATE_LIMIT"); ok {
+		rl, err := strconv.Atoi(envrateLimit)
+		if err != nil {
+			return Conf{}, fmt.Errorf("value of RATE_LIMIT is not a integer: %w", err)
+		}
+		conf.rateLimit = rl
 	}
 	if envpollInterval, ok := os.LookupEnv("POLL_INTERVAL"); ok {
 		fpi, err := strconv.Atoi(envpollInterval)

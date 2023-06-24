@@ -1,20 +1,26 @@
 package metriccollector
 
 import (
+	"fmt"
 	"math/rand"
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/mem"
 )
 
 const (
-	memStatsLen = 15
-	cpuStatsLen = 1
+	memStatsLen = 17
+	cpuStatsLen = 2
 )
 
 type Metrics struct {
 	mx           sync.Mutex
 	stats        runtime.MemStats
+	vmstats      mem.VirtualMemoryStat
+	cpuUsage     float64
 	pollCount    int64
 	randomValue  float64
 	pollInterval time.Duration
@@ -60,6 +66,31 @@ func (ms *Metrics) StartCollect() {
 	}
 }
 
+func (ms *Metrics) pollAddionalMetrics() error {
+	ms.mx.Lock()
+	defer ms.mx.Unlock()
+	vm, err := mem.VirtualMemory()
+	if err != nil {
+		return fmt.Errorf("collecting additional memory metrics failed %w", err)
+	}
+	ms.vmstats = *vm
+	cp, err := cpu.Percent(0, false)
+	if err != nil {
+		return fmt.Errorf("collecting additional cpu usage metrics failed %w", err)
+	}
+	ms.cpuUsage = cp[0]
+	ms.randomValue = rand.Float64()
+	ms.pollCount += 1
+	return nil
+}
+
+func (ms *Metrics) StartAdditionalCollect() {
+	for {
+		ms.pollAddionalMetrics()
+		time.Sleep(ms.pollInterval)
+	}
+}
+
 func (ms *Metrics) GetRuntimeMetrics() RuntimeMetrics {
 	ms.mx.Lock()
 	defer ms.mx.Unlock()
@@ -90,9 +121,12 @@ func (ms *Metrics) GetRuntimeMetrics() RuntimeMetrics {
 	memStats["TotalAlloc"] = ms.stats.TotalAlloc
 	memStats["NumForcedGC"] = uint64(ms.stats.NumForcedGC)
 	memStats["NumGC"] = uint64(ms.stats.NumGC)
+	memStats["TotalMemory"] = ms.vmstats.Total
+	memStats["FeeMemory"] = ms.vmstats.Free
 
 	cpuStats := make(map[string]float64, cpuStatsLen)
 	cpuStats["GCCPUFraction"] = ms.stats.GCCPUFraction
+	cpuStats["CPUutilization1"] = ms.cpuUsage
 
 	return RuntimeMetrics{memMetrics: memStats, cpuMetrics: cpuStats}
 
