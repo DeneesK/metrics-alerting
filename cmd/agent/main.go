@@ -15,7 +15,7 @@ func main() {
 	reportInterval := time.Duration(conf.reportingInterval) * time.Second
 	ms := metriccollector.NewCollector(conf.pollingInterval)
 	go ms.StartCollect()
-	log.Printf("client started sending data on %s", conf.runAddr)
+	log.Printf("client starts sending data on %s", conf.runAddr)
 
 	for {
 		if err := sendMetrics(&ms, conf.runAddr, conf.hashKey); err != nil {
