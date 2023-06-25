@@ -91,6 +91,13 @@ func (ms *Metrics) StartAdditionalCollect() {
 	}
 }
 
+func (ms *Metrics) FillChanel(ch chan RuntimeMetrics) {
+	for {
+		ch <- ms.GetRuntimeMetrics()
+		time.Sleep(ms.pollInterval)
+	}
+}
+
 func (ms *Metrics) GetRuntimeMetrics() RuntimeMetrics {
 	ms.mx.Lock()
 	defer ms.mx.Unlock()

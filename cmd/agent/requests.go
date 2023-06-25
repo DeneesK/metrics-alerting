@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -39,8 +38,7 @@ type Collector interface {
 	ResetPollCount()
 }
 
-func sendMetrics(ms Collector, runAddr string, hashKey string) error {
-	runtimeMetrics := ms.GetRuntimeMetrics()
+func sendMetrics(runtimeMetrics metriccollector.RuntimeMetrics, ms Collector, runAddr string, hashKey string) error {
 	cpuMetrics := runtimeMetrics.GetCPUMetrics()
 	memMetrics := runtimeMetrics.GetMemMetrics()
 	length := len(cpuMetrics) + len(memMetrics) + additionalMetricsLen
@@ -99,10 +97,9 @@ func sendBatch(retryClient *retryablehttp.Client, runAddr string, metrics []mode
 	if err != nil {
 		return 0, fmt.Errorf("request error - %w", err)
 	}
-	var hsh string
 	// autotests do not work correctly, so hashing is disabled for now
 	if hashKey != "1" {
-		hsh, err = calculateHash(r, hashKey)
+		hsh, err := calculateHash(r, hashKey)
 		req.Header.Add("HashSHA256", hsh)
 		if err != nil {
 			return 0, fmt.Errorf("hash calculation failed with error - %w", err)
@@ -147,12 +144,8 @@ func calculateHash(data []byte, hashKey string) (string, error) {
 	h := hmac.New(sha256.New, []byte(hashKey))
 	_, err := h.Write(data)
 	if err != nil {
-		return "", fmt.Errorf("didn't come up with %w", err)
+		return "", fmt.Errorf("writing data failed %w", err)
 	}
 	hs := fmt.Sprintf("%x", h.Sum(nil))
-	// TODO: clean up!!! later... ----->
-	log.Println(hs)
-	log.Printf("key: %v", hashKey)
-	// ------>
 	return hs, nil
 }
