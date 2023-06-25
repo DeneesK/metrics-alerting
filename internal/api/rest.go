@@ -29,8 +29,8 @@ type Store interface {
 
 func Routers(ms Store, logging *zap.SugaredLogger, key string) chi.Router {
 	r := chi.NewRouter()
-	// autotests do not work correctly, so hashing is disabled for now
-	if key == "1" {
+
+	if key == "" {
 		r.Use(checkHash(logging, key))
 	}
 	r.Use(withLogging(logging))
@@ -81,8 +81,8 @@ func UpdateJSON(storage Store, log *zap.SugaredLogger, key string) http.HandlerF
 			}
 			res.Header().Add("Content-Type", contentType)
 			res.WriteHeader(http.StatusOK)
-			// autotests do not work correctly, so hashing is disabled for now
-			if key == "1" {
+
+			if key == "" {
 				hsh, err := calculateHash(resp, key)
 				if err != nil {
 					log.Debugf("during attempt to get hash error ocurred: %v", err)
@@ -109,8 +109,8 @@ func UpdateJSON(storage Store, log *zap.SugaredLogger, key string) http.HandlerF
 			}
 			res.Header().Add("Content-Type", contentType)
 			res.WriteHeader(http.StatusOK)
-			// autotests do not work correctly, so hashing is disabled for now
-			if key == "1" {
+
+			if key == "" {
 				hsh, err := calculateHash(resp, key)
 				if err != nil {
 					log.Debugf("during attempt to get hash error ocurred: %v", err)
@@ -152,8 +152,8 @@ func ValueJSON(storage Store, log *zap.SugaredLogger, key string) http.HandlerFu
 			}
 			res.Header().Add("Content-Type", contentType)
 			res.WriteHeader(http.StatusOK)
-			// autotests do not work correctly, so hashing is disabled for now
-			if key == "1" {
+
+			if key == "" {
 				hsh, err := calculateHash(resp, key)
 				if err != nil {
 					log.Debugf("during attempt to get hash error ocurred: %v", err)
@@ -174,8 +174,8 @@ func ValueJSON(storage Store, log *zap.SugaredLogger, key string) http.HandlerFu
 			}
 			res.Header().Add("Content-Type", contentType)
 			res.WriteHeader(http.StatusOK)
-			// autotests do not work correctly, so hashing is disabled for now
-			if key == "1" {
+
+			if key == "" {
 				hsh, err := calculateHash(resp, key)
 				if err != nil {
 					log.Debugf("during attempt to get hash error ocurred: %v", err)
@@ -238,8 +238,8 @@ func Value(storage Store, log *zap.SugaredLogger, key string) http.HandlerFunc {
 		res.WriteHeader(http.StatusOK)
 		switch metricType {
 		case "counter":
-			// autotests do not work correctly, so hashing is disabled for now
-			if key == "1" {
+
+			if key == "" {
 				hsh, err := calculateHash([]byte(strconv.FormatInt(value.Counter, 10)), key)
 				if err != nil {
 					log.Debugf("during attempt to get hash error ocurred: %v", err)
@@ -250,8 +250,8 @@ func Value(storage Store, log *zap.SugaredLogger, key string) http.HandlerFunc {
 			}
 			res.Write([]byte(strconv.FormatInt(value.Counter, 10)))
 		case "gauge":
-			// autotests do not work correctly, so hashing is disabled for now
-			if key == "1" {
+
+			if key == "" {
 				hsh, err := calculateHash([]byte(strconv.FormatFloat(value.Gauge, 'f', -1, 64)), key)
 				if err != nil {
 					log.Debugf("during attempt to get hash error ocurred: %v", err)
@@ -290,8 +290,8 @@ func Metrics(storage Store, log *zap.SugaredLogger, key string) http.HandlerFunc
 		}
 		res.Header().Add("Content-Type", "text/html")
 		res.WriteHeader(http.StatusOK)
-		// autotests do not work correctly, so hashing is disabled for now
-		if key == "1" {
+
+		if key == "" {
 			hsh, err := calculateHash([]byte(r), key)
 			if err != nil {
 				log.Debugf("during attempt to get hash error ocurred: %v", err)

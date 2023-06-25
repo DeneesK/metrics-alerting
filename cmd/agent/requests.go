@@ -97,8 +97,8 @@ func sendBatch(retryClient *retryablehttp.Client, runAddr string, metrics []mode
 	if err != nil {
 		return 0, fmt.Errorf("request error - %w", err)
 	}
-	// autotests do not work correctly, so hashing is disabled for now
-	if hashKey != "1" {
+
+	if hashKey != "" {
 		hsh, err := calculateHash(r, hashKey)
 		req.Header.Add("HashSHA256", hsh)
 		if err != nil {
