@@ -24,7 +24,7 @@ The service allows:
 What is going to be added:
 - sending notifications under predefined conditions
 
-### API(Enpoints list of server):
+### API(Endpoints list of server):
 
 1. Ping, check service status
 `Get /ping`
