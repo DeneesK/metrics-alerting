@@ -66,3 +66,11 @@ Status code: `200`, `400`, `500`
 ```
 **Response**
 Status code: `200`,`400`, `404` 
+```json
+{
+"id": "t",
+"type": "counter",
+"delta": 100033330,
+"value": 0
+}
+```
