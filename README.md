@@ -29,7 +29,7 @@ What is going to be added:
 1. Ping, check service status
 `Get /ping`
 **Response**
-Status code: `200` or `400`
+#### Status code: `200` or `400`
 
 2. Send batch of metrics
 `Post /updates`
@@ -51,7 +51,7 @@ Status code: `200` or `400`
 }
 ```
 **Response**
-Status code: `200`, `400`, `500`
+##### Status code: `200`, `400`, `500`
 
 3. Send metrics
 `Post /update`
@@ -65,7 +65,7 @@ Status code: `200`, `400`, `500`
 }
 ```
 **Response**
-Status code: `200`,`400`, `404` 
+##### Status code: `200`,`400`, `404` 
 ```json
 {
 "id": "t",
