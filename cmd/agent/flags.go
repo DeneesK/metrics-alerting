@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 )
 
@@ -26,9 +27,18 @@ func parseFlags() (Conf, error) {
 	if envRunAddr, ok := os.LookupEnv("ADDRESS"); ok {
 		conf.runAddr = envRunAddr
 	}
+
 	if envHashKey, ok := os.LookupEnv("KEY"); ok {
 		conf.hashKey = envHashKey
 	}
+	correct, err := regexp.MatchString("[a-zA-Z1-9!@#$%^&*()_+;.,:;/\"'+-]", conf.hashKey)
+	if err != nil {
+		return Conf{}, fmt.Errorf("unable hash key %w", err)
+	}
+	if !correct {
+		return Conf{}, fmt.Errorf("hash must not contained non-printable characters %w", err)
+	}
+
 	if envreportInterval, ok := os.LookupEnv("REPORT_INTERVAL"); ok {
 		fri, err := strconv.Atoi(envreportInterval)
 		if err != nil {

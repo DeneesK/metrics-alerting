@@ -3,15 +3,13 @@ package api
 import (
 	"bytes"
 	"compress/gzip"
-	"crypto/hmac"
-	"crypto/sha256"
-	"fmt"
 	"io"
 
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/DeneesK/metrics-alerting/internal/bodyhasher"
 	"go.uber.org/zap"
 )
 
@@ -146,13 +144,18 @@ func checkHash(log *zap.SugaredLogger, key string) func(http.Handler) http.Handl
 				return
 			}
 			req.Body.Close()
-			hs, err := calculateHash(bodyBytes, key)
+			var ha string
+			if ha = req.Header.Get("HashSHA256"); ha == "" {
+				log.Error("empty header HashSHA256")
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			hs, err := bodyhasher.CalculateHash(bodyBytes, key)
 			if err != nil {
 				log.Errorf("hash calculation failed - %w", err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			ha := req.Header.Get("HashSHA256")
 			if strings.Compare(hs, ha) != 0 {
 				log.Errorf("hashes must be equal - %w", err)
 				w.WriteHeader(http.StatusBadRequest)
@@ -162,14 +165,4 @@ func checkHash(log *zap.SugaredLogger, key string) func(http.Handler) http.Handl
 			h.ServeHTTP(w, req)
 		})
 	}
-}
-
-func calculateHash(data []byte, hashKey string) (string, error) {
-	h := hmac.New(sha256.New, []byte(hashKey))
-	_, err := h.Write(data)
-	if err != nil {
-		return "", fmt.Errorf("didn't come up with %w", err)
-	}
-	hs := fmt.Sprintf("%x", h.Sum(nil))
-	return hs, nil
 }

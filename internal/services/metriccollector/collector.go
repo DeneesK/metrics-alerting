@@ -91,10 +91,10 @@ func (ms *Metrics) StartAdditionalCollect() {
 	}
 }
 
-func (ms *Metrics) FillChanel(ch chan RuntimeMetrics) {
+func (ms *Metrics) FillChanel(ch chan RuntimeMetrics, reportInterval time.Duration) {
 	for {
 		ch <- ms.GetRuntimeMetrics()
-		time.Sleep(ms.pollInterval)
+		time.Sleep(reportInterval)
 	}
 }
 

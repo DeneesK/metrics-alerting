@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/DeneesK/metrics-alerting/internal/bodyhasher"
 	"github.com/DeneesK/metrics-alerting/internal/models"
 	"github.com/DeneesK/metrics-alerting/internal/storage"
 	"github.com/go-chi/chi"
@@ -29,8 +30,7 @@ type Store interface {
 
 func Routers(ms Store, logging *zap.SugaredLogger, key string) chi.Router {
 	r := chi.NewRouter()
-
-	if key == "" {
+	if key != "" {
 		r.Use(checkHash(logging, key))
 	}
 	r.Use(withLogging(logging))
@@ -82,8 +82,8 @@ func UpdateJSON(storage Store, log *zap.SugaredLogger, key string) http.HandlerF
 			res.Header().Add("Content-Type", contentType)
 			res.WriteHeader(http.StatusOK)
 
-			if key == "" {
-				hsh, err := calculateHash(resp, key)
+			if key != "" {
+				hsh, err := bodyhasher.CalculateHash(resp, key)
 				if err != nil {
 					log.Debugf("during attempt to get hash error ocurred: %v", err)
 					res.WriteHeader(http.StatusInternalServerError)
@@ -110,8 +110,8 @@ func UpdateJSON(storage Store, log *zap.SugaredLogger, key string) http.HandlerF
 			res.Header().Add("Content-Type", contentType)
 			res.WriteHeader(http.StatusOK)
 
-			if key == "" {
-				hsh, err := calculateHash(resp, key)
+			if key != "" {
+				hsh, err := bodyhasher.CalculateHash(resp, key)
 				if err != nil {
 					log.Debugf("during attempt to get hash error ocurred: %v", err)
 					res.WriteHeader(http.StatusInternalServerError)
@@ -153,8 +153,8 @@ func ValueJSON(storage Store, log *zap.SugaredLogger, key string) http.HandlerFu
 			res.Header().Add("Content-Type", contentType)
 			res.WriteHeader(http.StatusOK)
 
-			if key == "" {
-				hsh, err := calculateHash(resp, key)
+			if key != "" {
+				hsh, err := bodyhasher.CalculateHash(resp, key)
 				if err != nil {
 					log.Debugf("during attempt to get hash error ocurred: %v", err)
 					res.WriteHeader(http.StatusInternalServerError)
@@ -175,8 +175,8 @@ func ValueJSON(storage Store, log *zap.SugaredLogger, key string) http.HandlerFu
 			res.Header().Add("Content-Type", contentType)
 			res.WriteHeader(http.StatusOK)
 
-			if key == "" {
-				hsh, err := calculateHash(resp, key)
+			if key != "" {
+				hsh, err := bodyhasher.CalculateHash(resp, key)
 				if err != nil {
 					log.Debugf("during attempt to get hash error ocurred: %v", err)
 					res.WriteHeader(http.StatusInternalServerError)
@@ -239,8 +239,8 @@ func Value(storage Store, log *zap.SugaredLogger, key string) http.HandlerFunc {
 		switch metricType {
 		case "counter":
 
-			if key == "" {
-				hsh, err := calculateHash([]byte(strconv.FormatInt(value.Counter, 10)), key)
+			if key != "" {
+				hsh, err := bodyhasher.CalculateHash([]byte(strconv.FormatInt(value.Counter, 10)), key)
 				if err != nil {
 					log.Debugf("during attempt to get hash error ocurred: %v", err)
 					res.WriteHeader(http.StatusInternalServerError)
@@ -251,8 +251,8 @@ func Value(storage Store, log *zap.SugaredLogger, key string) http.HandlerFunc {
 			res.Write([]byte(strconv.FormatInt(value.Counter, 10)))
 		case "gauge":
 
-			if key == "" {
-				hsh, err := calculateHash([]byte(strconv.FormatFloat(value.Gauge, 'f', -1, 64)), key)
+			if key != "" {
+				hsh, err := bodyhasher.CalculateHash([]byte(strconv.FormatFloat(value.Gauge, 'f', -1, 64)), key)
 				if err != nil {
 					log.Debugf("during attempt to get hash error ocurred: %v", err)
 					res.WriteHeader(http.StatusInternalServerError)
@@ -291,8 +291,8 @@ func Metrics(storage Store, log *zap.SugaredLogger, key string) http.HandlerFunc
 		res.Header().Add("Content-Type", "text/html")
 		res.WriteHeader(http.StatusOK)
 
-		if key == "" {
-			hsh, err := calculateHash([]byte(r), key)
+		if key != "" {
+			hsh, err := bodyhasher.CalculateHash([]byte(r), key)
 			if err != nil {
 				log.Debugf("during attempt to get hash error ocurred: %v", err)
 				res.WriteHeader(http.StatusInternalServerError)

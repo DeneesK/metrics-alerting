@@ -23,3 +23,54 @@ The service allows:
 
 What is going to be added:
 - sending notifications under predefined conditions
+
+### API(Endpoints list of server):
+
+1. Ping, check service status
+`Get /ping`
+**Response**
+#### Status code: `200` or `400`
+
+2. Send batch of metrics
+`Post /updates`
+#### Example:
+```json
+{
+[
+    {
+    "id": "t",
+    "type": "counter",
+    "delta": 100033330
+    },
+    {
+    "id": "t2",
+    "type": "gauge",
+    "value": 77777.1943
+    }
+]
+}
+```
+**Response**
+##### Status code: `200`, `400`, `500`
+
+3. Send metrics
+`Post /update`
+`Post /updates`
+#### Example:
+```json
+{
+"id": "t",
+"type": "counter",
+"delta": 100033330
+}
+```
+**Response**
+##### Status code: `200`,`400`, `404` 
+```json
+{
+"id": "t",
+"type": "counter",
+"delta": 100033330,
+"value": 0
+}
+```

@@ -3,8 +3,6 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
-	"crypto/hmac"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DeneesK/metrics-alerting/internal/bodyhasher"
 	"github.com/DeneesK/metrics-alerting/internal/models"
 	"github.com/DeneesK/metrics-alerting/internal/services/metriccollector"
 	"github.com/hashicorp/go-retryablehttp"
@@ -99,7 +98,7 @@ func sendBatch(retryClient *retryablehttp.Client, runAddr string, metrics []mode
 	}
 
 	if hashKey != "" {
-		hsh, err := calculateHash(r, hashKey)
+		hsh, err := bodyhasher.CalculateHash(r, hashKey)
 		req.Header.Add("HashSHA256", hsh)
 		if err != nil {
 			return 0, fmt.Errorf("hash calculation failed with error - %w", err)
@@ -107,7 +106,6 @@ func sendBatch(retryClient *retryablehttp.Client, runAddr string, metrics []mode
 	}
 	req.Header.Add("Accept-Encoding", encodeType)
 	req.Header.Add("Content-Encoding", encodeType)
-	req.Header.Add("Content-Type", contentType)
 	req.Header.Add("Content-Type", contentType)
 	resp, err := retryClient.Do(req)
 	if err != nil {
@@ -138,14 +136,4 @@ func compress(b []byte) ([]byte, error) {
 func linearBackoff(min, _ time.Duration, attemptNum int, _ *http.Response) time.Duration {
 	sleepTime := min + min*time.Duration(2*attemptNum)
 	return sleepTime
-}
-
-func calculateHash(data []byte, hashKey string) (string, error) {
-	h := hmac.New(sha256.New, []byte(hashKey))
-	_, err := h.Write(data)
-	if err != nil {
-		return "", fmt.Errorf("writing data failed %w", err)
-	}
-	hs := fmt.Sprintf("%x", h.Sum(nil))
-	return hs, nil
 }
