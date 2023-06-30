@@ -19,7 +19,7 @@ type Conf struct {
 func parseFlags() (Conf, error) {
 	var conf Conf
 	flag.StringVar(&conf.runAddr, "a", "localhost:8080", "address and port to run server")
-	flag.StringVar(&conf.hashKey, "k", "", "the key to calculate hash")
+	flag.StringVar(&conf.hashKey, "k", "", "the key to calculate hash") // non-printable characters check at :35
 	flag.IntVar(&conf.reportingInterval, "r", 10, "interval of sending metrics to the server")
 	flag.IntVar(&conf.pollingInterval, "p", 2, "interval of polling metrics from the runtime package")
 	flag.IntVar(&conf.rateLimit, "l", 1, "number of outgoing requests to the server at the same time")
@@ -31,6 +31,7 @@ func parseFlags() (Conf, error) {
 	if envHashKey, ok := os.LookupEnv("KEY"); ok {
 		conf.hashKey = envHashKey
 	}
+
 	correct, err := regexp.MatchString("[a-zA-Z1-9!@#$%^&*()_+;.,:;/\"'+-]", conf.hashKey)
 	if err != nil {
 		return Conf{}, fmt.Errorf("unable hash key %w", err)
