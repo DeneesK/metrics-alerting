@@ -1,6 +1,7 @@
 package metriccollector
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"runtime"
@@ -59,10 +60,16 @@ func (ms *Metrics) pollMetrics() {
 	ms.pollCount += 1
 }
 
-func (ms *Metrics) StartCollect() {
+func (ms *Metrics) StartCollect(ctx context.Context) {
+loop:
 	for {
-		ms.pollMetrics()
-		time.Sleep(ms.pollInterval)
+		select {
+		case <-ctx.Done():
+			break loop
+		default:
+			ms.pollMetrics()
+			time.Sleep(ms.pollInterval)
+		}
 	}
 }
 
@@ -84,17 +91,29 @@ func (ms *Metrics) pollAddionalMetrics() error {
 	return nil
 }
 
-func (ms *Metrics) StartAdditionalCollect() {
+func (ms *Metrics) StartAdditionalCollect(ctx context.Context) {
+loop:
 	for {
-		ms.pollAddionalMetrics()
-		time.Sleep(ms.pollInterval)
+		select {
+		case <-ctx.Done():
+			break loop
+		default:
+			ms.pollAddionalMetrics()
+			time.Sleep(ms.pollInterval)
+		}
 	}
 }
 
-func (ms *Metrics) FillChanel(ch chan RuntimeMetrics, reportInterval time.Duration) {
+func (ms *Metrics) FillChanel(ctx context.Context, ch chan RuntimeMetrics, reportInterval time.Duration) {
+loop:
 	for {
-		ch <- ms.GetRuntimeMetrics()
-		time.Sleep(reportInterval)
+		select {
+		case <-ctx.Done():
+			break loop
+		default:
+			ch <- ms.GetRuntimeMetrics()
+			time.Sleep(reportInterval)
+		}
 	}
 }
 

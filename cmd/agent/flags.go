@@ -4,22 +4,25 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"regexp"
 	"strconv"
+
+	"github.com/DeneesK/metrics-alerting/internal/bodyhasher"
 )
 
 type Conf struct {
 	runAddr           string
-	hashKey           string
+	hashKey           bodyhasher.HashKey
 	reportingInterval int
 	pollingInterval   int
 	rateLimit         int
 }
 
+var defaultKey = bodyhasher.HashKey{}
+
 func parseFlags() (Conf, error) {
 	var conf Conf
 	flag.StringVar(&conf.runAddr, "a", "localhost:8080", "address and port to run server")
-	flag.StringVar(&conf.hashKey, "k", "", "the key to calculate hash") // non-printable characters check at :35
+	flag.TextVar(&conf.hashKey, "k", &defaultKey, "the key to calculate hash")
 	flag.IntVar(&conf.reportingInterval, "r", 10, "interval of sending metrics to the server")
 	flag.IntVar(&conf.pollingInterval, "p", 2, "interval of polling metrics from the runtime package")
 	flag.IntVar(&conf.rateLimit, "l", 1, "number of outgoing requests to the server at the same time")
@@ -29,15 +32,7 @@ func parseFlags() (Conf, error) {
 	}
 
 	if envHashKey, ok := os.LookupEnv("KEY"); ok {
-		conf.hashKey = envHashKey
-	}
-
-	correct, err := regexp.MatchString("[a-zA-Z1-9!@#$%^&*()_+;.,:;/\"'+-]", conf.hashKey)
-	if err != nil {
-		return Conf{}, fmt.Errorf("unable hash key %w", err)
-	}
-	if !correct {
-		return Conf{}, fmt.Errorf("hash must not contained non-printable characters %w", err)
+		conf.hashKey.UnmarshalText([]byte(envHashKey))
 	}
 
 	if envreportInterval, ok := os.LookupEnv("REPORT_INTERVAL"); ok {

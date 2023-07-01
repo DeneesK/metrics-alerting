@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -29,28 +30,40 @@ func run() error {
 
 	ch := make(chan metriccollector.RuntimeMetrics, conf.rateLimit)
 	reportInterval := time.Duration(conf.reportingInterval) * time.Second
-	go ms.StartCollect()
-	go ms.StartAdditionalCollect()
-	go ms.FillChanel(ch, reportInterval)
+
+	ctx, cancelContext := context.WithCancel(context.Background())
+
+	termChan := make(chan os.Signal, 1)
+	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go ms.StartCollect(ctx)
+	go ms.StartAdditionalCollect(ctx)
+	go ms.FillChanel(ctx, ch, reportInterval)
 
 	log.Printf("client started sending data on %s", conf.runAddr)
 	var wg sync.WaitGroup
+
 	for i := 0; i < conf.rateLimit; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for metrics := range ch {
-				if err := sendMetrics(metrics, &ms, conf.runAddr, conf.hashKey); err != nil {
-					log.Println(err)
+		loop:
+			for {
+				select {
+				case metrics := <-ch:
+					if err := sendMetrics(metrics, &ms, conf.runAddr, conf.hashKey.Key); err != nil {
+						log.Println(err)
+					}
+				case <-ctx.Done():
+					break loop
 				}
 			}
 		}()
 	}
-	termChan := make(chan os.Signal, 1)
-	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
+
 	<-termChan
-	close(ch)
-	log.Println("All workers were shuted down")
+	cancelContext()
 	wg.Wait()
+	log.Println("All workers were shuted down")
 	return nil
 }

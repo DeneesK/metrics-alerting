@@ -28,9 +28,9 @@ type Store interface {
 	Close() error
 }
 
-func Routers(ms Store, logging *zap.SugaredLogger, key string) chi.Router {
+func Routers(ms Store, logging *zap.SugaredLogger, key []byte) chi.Router {
 	r := chi.NewRouter()
-	if key != "" {
+	if len(key) != 0 {
 		r.Use(checkHash(logging, key))
 	}
 	r.Use(withLogging(logging))
@@ -62,7 +62,7 @@ func UpdatesJSON(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 	}
 }
 
-func UpdateJSON(storage Store, log *zap.SugaredLogger, key string) http.HandlerFunc {
+func UpdateJSON(storage Store, log *zap.SugaredLogger, key []byte) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		var metric models.Metrics
 		if err := json.NewDecoder(req.Body).Decode(&metric); err != nil {
@@ -82,7 +82,7 @@ func UpdateJSON(storage Store, log *zap.SugaredLogger, key string) http.HandlerF
 			res.Header().Add("Content-Type", contentType)
 			res.WriteHeader(http.StatusOK)
 
-			if key != "" {
+			if len(key) != 0 {
 				hsh, err := bodyhasher.CalculateHash(resp, key)
 				if err != nil {
 					log.Debugf("during attempt to get hash error ocurred: %v", err)
@@ -110,7 +110,7 @@ func UpdateJSON(storage Store, log *zap.SugaredLogger, key string) http.HandlerF
 			res.Header().Add("Content-Type", contentType)
 			res.WriteHeader(http.StatusOK)
 
-			if key != "" {
+			if len(key) != 0 {
 				hsh, err := bodyhasher.CalculateHash(resp, key)
 				if err != nil {
 					log.Debugf("during attempt to get hash error ocurred: %v", err)
@@ -127,7 +127,7 @@ func UpdateJSON(storage Store, log *zap.SugaredLogger, key string) http.HandlerF
 	}
 }
 
-func ValueJSON(storage Store, log *zap.SugaredLogger, key string) http.HandlerFunc {
+func ValueJSON(storage Store, log *zap.SugaredLogger, key []byte) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		var metric models.Metrics
 		if err := json.NewDecoder(req.Body).Decode(&metric); err != nil {
@@ -153,7 +153,7 @@ func ValueJSON(storage Store, log *zap.SugaredLogger, key string) http.HandlerFu
 			res.Header().Add("Content-Type", contentType)
 			res.WriteHeader(http.StatusOK)
 
-			if key != "" {
+			if len(key) != 0 {
 				hsh, err := bodyhasher.CalculateHash(resp, key)
 				if err != nil {
 					log.Debugf("during attempt to get hash error ocurred: %v", err)
@@ -175,7 +175,7 @@ func ValueJSON(storage Store, log *zap.SugaredLogger, key string) http.HandlerFu
 			res.Header().Add("Content-Type", contentType)
 			res.WriteHeader(http.StatusOK)
 
-			if key != "" {
+			if len(key) != 0 {
 				hsh, err := bodyhasher.CalculateHash(resp, key)
 				if err != nil {
 					log.Debugf("during attempt to get hash error ocurred: %v", err)
@@ -224,7 +224,7 @@ func Update(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 	}
 }
 
-func Value(storage Store, log *zap.SugaredLogger, key string) http.HandlerFunc {
+func Value(storage Store, log *zap.SugaredLogger, key []byte) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		metricType := chi.URLParam(req, "metricType")
 		metricName := chi.URLParam(req, "metricName")
@@ -239,7 +239,7 @@ func Value(storage Store, log *zap.SugaredLogger, key string) http.HandlerFunc {
 		switch metricType {
 		case "counter":
 
-			if key != "" {
+			if len(key) != 0 {
 				hsh, err := bodyhasher.CalculateHash([]byte(strconv.FormatInt(value.Counter, 10)), key)
 				if err != nil {
 					log.Debugf("during attempt to get hash error ocurred: %v", err)
@@ -251,7 +251,7 @@ func Value(storage Store, log *zap.SugaredLogger, key string) http.HandlerFunc {
 			res.Write([]byte(strconv.FormatInt(value.Counter, 10)))
 		case "gauge":
 
-			if key != "" {
+			if len(key) != 0 {
 				hsh, err := bodyhasher.CalculateHash([]byte(strconv.FormatFloat(value.Gauge, 'f', -1, 64)), key)
 				if err != nil {
 					log.Debugf("during attempt to get hash error ocurred: %v", err)
@@ -267,7 +267,7 @@ func Value(storage Store, log *zap.SugaredLogger, key string) http.HandlerFunc {
 	}
 }
 
-func Metrics(storage Store, log *zap.SugaredLogger, key string) http.HandlerFunc {
+func Metrics(storage Store, log *zap.SugaredLogger, key []byte) http.HandlerFunc {
 	return func(res http.ResponseWriter, _ *http.Request) {
 		c, err := storage.GetCounterMetrics()
 		if err != nil {
@@ -291,7 +291,7 @@ func Metrics(storage Store, log *zap.SugaredLogger, key string) http.HandlerFunc
 		res.Header().Add("Content-Type", "text/html")
 		res.WriteHeader(http.StatusOK)
 
-		if key != "" {
+		if len(key) != 0 {
 			hsh, err := bodyhasher.CalculateHash([]byte(r), key)
 			if err != nil {
 				log.Debugf("during attempt to get hash error ocurred: %v", err)

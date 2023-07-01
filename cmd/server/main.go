@@ -30,7 +30,7 @@ func run() error {
 		return err
 	}
 	defer metricsStorage.Close()
-	r := api.Routers(metricsStorage, log, conf.hashKey)
+	r := api.Routers(metricsStorage, log, conf.hashKey.Key)
 	log.Infof("server started at %s", conf.runAddr)
 	return http.ListenAndServe(conf.runAddr, r)
 }

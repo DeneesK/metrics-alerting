@@ -134,7 +134,7 @@ func withLogging(log *zap.SugaredLogger) func(http.Handler) http.Handler {
 	}
 }
 
-func checkHash(log *zap.SugaredLogger, key string) func(http.Handler) http.Handler {
+func checkHash(log *zap.SugaredLogger, key []byte) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			bodyBytes, err := io.ReadAll(req.Body)
@@ -145,7 +145,7 @@ func checkHash(log *zap.SugaredLogger, key string) func(http.Handler) http.Handl
 			}
 			req.Body.Close()
 			var ha string
-			if ha = req.Header.Get("HashSHA256"); ha == "" {
+			if ha = req.Header.Get("ServerHashSHA256"); ha == "" {
 				log.Error("empty header HashSHA256")
 				w.WriteHeader(http.StatusBadRequest)
 				return

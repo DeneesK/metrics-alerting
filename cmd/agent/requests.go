@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -30,14 +31,14 @@ const (
 )
 
 type Collector interface {
-	StartCollect()
+	StartCollect(context.Context)
 	GetRuntimeMetrics() metriccollector.RuntimeMetrics
 	GetRandomValue() float64
 	GetPollCount() int64
 	ResetPollCount()
 }
 
-func sendMetrics(runtimeMetrics metriccollector.RuntimeMetrics, ms Collector, runAddr string, hashKey string) error {
+func sendMetrics(runtimeMetrics metriccollector.RuntimeMetrics, ms Collector, runAddr string, hashKey []byte) error {
 	cpuMetrics := runtimeMetrics.GetCPUMetrics()
 	memMetrics := runtimeMetrics.GetMemMetrics()
 	length := len(cpuMetrics) + len(memMetrics) + additionalMetricsLen
@@ -71,7 +72,7 @@ func sendMetrics(runtimeMetrics metriccollector.RuntimeMetrics, ms Collector, ru
 	return nil
 }
 
-func sendBatch(retryClient *retryablehttp.Client, runAddr string, metrics []models.Metrics, hashKey string) (int, error) {
+func sendBatch(retryClient *retryablehttp.Client, runAddr string, metrics []models.Metrics, hashKey []byte) (int, error) {
 	res, err := json.Marshal(&metrics)
 	if err != nil {
 		return 0, fmt.Errorf("serialization error - %w", err)
@@ -97,7 +98,7 @@ func sendBatch(retryClient *retryablehttp.Client, runAddr string, metrics []mode
 		return 0, fmt.Errorf("request error - %w", err)
 	}
 
-	if hashKey != "" {
+	if len(hashKey) != 0 {
 		hsh, err := bodyhasher.CalculateHash(r, hashKey)
 		req.Header.Add("HashSHA256", hsh)
 		if err != nil {

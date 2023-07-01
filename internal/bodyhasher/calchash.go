@@ -7,8 +7,20 @@ import (
 	"fmt"
 )
 
-func CalculateHash(data []byte, hashKey string) (string, error) {
-	h := hmac.New(sha256.New, []byte(hashKey))
+type HashKey struct {
+	Key []byte
+}
+
+func (h *HashKey) UnmarshalText(text []byte) error {
+	h.Key = text
+	return nil
+}
+func (h *HashKey) MarshalText() ([]byte, error) {
+	return h.Key, nil
+}
+
+func CalculateHash(data []byte, hashKey []byte) (string, error) {
+	h := hmac.New(sha256.New, hashKey)
 	_, err := h.Write(data)
 	if err != nil {
 		return "", fmt.Errorf("didn't come up with %w", err)
