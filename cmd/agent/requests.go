@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DeneesK/metrics-alerting/internal/api"
 	"github.com/DeneesK/metrics-alerting/internal/bodyhasher"
 	"github.com/DeneesK/metrics-alerting/internal/models"
 	"github.com/DeneesK/metrics-alerting/internal/services/metriccollector"
@@ -100,7 +101,7 @@ func sendBatch(retryClient *retryablehttp.Client, runAddr string, metrics []mode
 
 	if len(hashKey) != 0 {
 		hsh, err := bodyhasher.CalculateHash(r, hashKey)
-		req.Header.Add("HashSHA256", hsh)
+		req.Header.Add(api.HashHeader, hsh)
 		if err != nil {
 			return 0, fmt.Errorf("hash calculation failed with error - %w", err)
 		}

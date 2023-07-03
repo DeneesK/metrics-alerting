@@ -30,18 +30,15 @@ func run() error {
 
 	ch := make(chan metriccollector.RuntimeMetrics, conf.rateLimit)
 	reportInterval := time.Duration(conf.reportingInterval) * time.Second
-
 	ctx, cancelContext := context.WithCancel(context.Background())
 
 	termChan := make(chan os.Signal, 1)
 	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
 
-	go ms.StartCollect(ctx)
-	go ms.StartAdditionalCollect(ctx)
-	go ms.FillChanel(ctx, ch, reportInterval)
-
 	log.Printf("client started sending data on %s", conf.runAddr)
 	var wg sync.WaitGroup
+
+	collect(ctx, &wg, ch, reportInterval, &ms)
 
 	for i := 0; i < conf.rateLimit; i++ {
 		wg.Add(1)
@@ -51,7 +48,7 @@ func run() error {
 			for {
 				select {
 				case metrics := <-ch:
-					if err := sendMetrics(metrics, &ms, conf.runAddr, conf.hashKey.Key); err != nil {
+					if err := sendMetrics(metrics, &ms, conf.runAddr, conf.hashKey); err != nil {
 						log.Println(err)
 					}
 				case <-ctx.Done():
@@ -65,4 +62,35 @@ func run() error {
 	wg.Wait()
 	log.Println("All workers were shuted down")
 	return nil
+}
+
+func collect(ctx context.Context,
+	wg *sync.WaitGroup,
+	ch chan metriccollector.RuntimeMetrics,
+	reportInterval time.Duration,
+	ms *metriccollector.Metrics) {
+
+	go mainMetrics(ctx, wg, ms)
+	go additionalMetrics(ctx, wg, ms)
+	go fillChanel(ctx, wg, ms, ch, reportInterval)
+
+}
+
+func mainMetrics(ctx context.Context, wg *sync.WaitGroup, ms *metriccollector.Metrics) {
+	wg.Add(1)
+	defer wg.Done()
+	ms.StartCollect(ctx)
+}
+
+func additionalMetrics(ctx context.Context, wg *sync.WaitGroup, ms *metriccollector.Metrics) {
+	wg.Add(1)
+	defer wg.Done()
+	ms.StartAdditionalCollect(ctx)
+}
+
+func fillChanel(ctx context.Context, wg *sync.WaitGroup, ms *metriccollector.Metrics,
+	ch chan metriccollector.RuntimeMetrics, reportInterval time.Duration) {
+	wg.Add(1)
+	defer wg.Done()
+	ms.FillChanel(ctx, ch, reportInterval)
 }

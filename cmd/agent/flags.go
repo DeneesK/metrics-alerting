@@ -5,24 +5,21 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-
-	"github.com/DeneesK/metrics-alerting/internal/bodyhasher"
 )
 
 type Conf struct {
 	runAddr           string
-	hashKey           bodyhasher.HashKey
+	hashKey           []byte
 	reportingInterval int
 	pollingInterval   int
 	rateLimit         int
 }
 
-var defaultKey = bodyhasher.HashKey{}
-
 func parseFlags() (Conf, error) {
+	var hashString string
 	var conf Conf
 	flag.StringVar(&conf.runAddr, "a", "localhost:8080", "address and port to run server")
-	flag.TextVar(&conf.hashKey, "k", &defaultKey, "the key to calculate hash")
+	flag.StringVar(&hashString, "k", "", "the key to calculate hash")
 	flag.IntVar(&conf.reportingInterval, "r", 10, "interval of sending metrics to the server")
 	flag.IntVar(&conf.pollingInterval, "p", 2, "interval of polling metrics from the runtime package")
 	flag.IntVar(&conf.rateLimit, "l", 1, "number of outgoing requests to the server at the same time")
@@ -31,8 +28,11 @@ func parseFlags() (Conf, error) {
 		conf.runAddr = envRunAddr
 	}
 
+	if hashString != "" {
+		conf.hashKey = []byte(hashString)
+	}
 	if envHashKey, ok := os.LookupEnv("KEY"); ok {
-		conf.hashKey.UnmarshalText([]byte(envHashKey))
+		conf.hashKey = []byte(envHashKey)
 	}
 
 	if envreportInterval, ok := os.LookupEnv("REPORT_INTERVAL"); ok {

@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-
-	"github.com/DeneesK/metrics-alerting/internal/bodyhasher"
 )
 
 type Conf struct {
@@ -16,27 +14,28 @@ type Conf struct {
 	filePath      string
 	isRestore     bool
 	dsn           string
-	hashKey       bodyhasher.HashKey
+	hashKey       []byte
 }
-
-var defaultKey = bodyhasher.HashKey{}
 
 func parseFlags() (Conf, error) {
 	var conf Conf
-
+	var hashString string
 	flag.StringVar(&conf.runAddr, "a", ":8080", "address and port to run server")
 	flag.StringVar(&conf.logLevel, "l", "debug", "log level")
 	flag.StringVar(&conf.filePath, "f", "tmp/metrics-db.json", "path to store file")
-	flag.StringVar(&conf.dsn, "d", "host=localhost user=app password=123qwe dbname=go_train sslmode=disable", "database's dsn connection configs")
-	flag.TextVar(&conf.hashKey, "k", &defaultKey, "the key to calculate hash")
+	flag.StringVar(&conf.dsn, "d", "", "database's dsn connection configs")
+	flag.StringVar(&hashString, "k", "", "the key to calculate hash")
 	flag.BoolVar(&conf.isRestore, "r", true, "load saved data")
 	flag.IntVar(&conf.storeInterval, "i", 5, "interval of storing data on disk")
 	flag.Parse()
 	if envRunAddr, ok := os.LookupEnv("ADDRESS"); ok {
 		conf.runAddr = envRunAddr
 	}
+	if hashString != "" {
+		conf.hashKey = []byte(hashString)
+	}
 	if envHashKey, ok := os.LookupEnv("KEY"); ok {
-		conf.hashKey.UnmarshalText([]byte(envHashKey))
+		conf.hashKey = []byte(envHashKey)
 	}
 	if envLogLVL, ok := os.LookupEnv("LOG_LEVEL"); ok {
 		conf.logLevel = envLogLVL

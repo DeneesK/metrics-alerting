@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"compress/gzip"
+	"fmt"
 	"io"
 
 	"net/http"
@@ -13,6 +14,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const HashHeader = "HashSHA256"
+
 type responseData struct {
 	status int
 	size   int
@@ -21,6 +24,24 @@ type responseData struct {
 type loggingResponseWriter struct {
 	http.ResponseWriter
 	responseData *responseData
+}
+
+type hashBody struct {
+	http.ResponseWriter
+	hashKey []byte
+}
+
+func (r *hashBody) Write(b []byte) (int, error) {
+	hs, err := bodyhasher.CalculateHash(b, r.hashKey)
+	if err != nil {
+		return 0, fmt.Errorf("hash calculation failed - %w", err)
+	}
+	r.ResponseWriter.Header().Add(HashHeader, hs)
+	size, err := r.ResponseWriter.Write(b)
+	if err != nil {
+		return size, err
+	}
+	return size, nil
 }
 
 func (r *loggingResponseWriter) Write(b []byte) (int, error) {
@@ -134,7 +155,7 @@ func withLogging(log *zap.SugaredLogger) func(http.Handler) http.Handler {
 	}
 }
 
-func checkHash(log *zap.SugaredLogger, key []byte) func(http.Handler) http.Handler {
+func hasher(log *zap.SugaredLogger, key []byte) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			bodyBytes, err := io.ReadAll(req.Body)
@@ -145,8 +166,8 @@ func checkHash(log *zap.SugaredLogger, key []byte) func(http.Handler) http.Handl
 			}
 			req.Body.Close()
 			var ha string
-			if ha = req.Header.Get("ServerHashSHA256"); ha == "" {
-				log.Error("empty header HashSHA256")
+			if ha = req.Header.Get(HashHeader); ha == "" {
+				log.Errorf("empty header %s", HashHeader)
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
@@ -162,7 +183,9 @@ func checkHash(log *zap.SugaredLogger, key []byte) func(http.Handler) http.Handl
 				return
 			}
 			req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-			h.ServeHTTP(w, req)
+
+			hb := hashBody{w, key}
+			h.ServeHTTP(&hb, req)
 		})
 	}
 }
