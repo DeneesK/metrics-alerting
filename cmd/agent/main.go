@@ -60,7 +60,6 @@ func run() error {
 			}
 		}()
 	}
-
 	<-termChan
 	cancelContext()
 	wg.Wait()

@@ -3,36 +3,55 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"embed"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/DeneesK/metrics-alerting/internal/models"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/sethvargo/go-retry"
 	"go.uber.org/zap"
 )
 
-const createTableQuery = `CREATE TABLE IF NOT EXISTS metrics(
-	"metrictype" TEXT NOT NULL,
-	"metricname" TEXT NOT NULL UNIQUE,
-	"counter" BIGINT,
-	"gauge" DOUBLE PRECISION)`
+//go:embed migrations/*.sql
+var migrationsDir embed.FS
 
 type DBStorage struct {
 	log *zap.SugaredLogger
 	db  *sql.DB
 }
 
+func runMigrations(dsn string) error {
+	d, err := iofs.New(migrationsDir, "migrations")
+	if err != nil {
+		return fmt.Errorf("failed to return an iofs driver: %w", err)
+	}
+
+	m, err := migrate.NewWithSourceInstance("iofs", d, dsn)
+	if err != nil {
+		return fmt.Errorf("failed to get a new migrate instance: %w", err)
+	}
+	if err := m.Up(); err != nil {
+		if !errors.Is(err, migrate.ErrNoChange) {
+			return fmt.Errorf("failed to apply migrations to the DB: %w", err)
+		}
+	}
+	return nil
+}
+
 func NewDBStorage(dsn string, log *zap.SugaredLogger) (*DBStorage, error) {
-	db, err := NewDBSession(dsn)
+	err := runMigrations(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("during initializing of new db session, error occurred: %w", err)
 	}
 
-	err = createTable(db)
+	db, err := NewDBSession(dsn)
 	if err != nil {
-		return nil, fmt.Errorf("impossible to create table: %w", err)
+		return nil, fmt.Errorf("during initializing of new db session, error occurred: %w", err)
 	}
 
 	return &DBStorage{log: log, db: db}, nil
@@ -213,14 +232,6 @@ func (storage *DBStorage) insertBatch(ctx context.Context, metrics []models.Metr
 		return fmt.Errorf("insert batch error: %w", err)
 	}
 	return tx.Commit()
-}
-
-func createTable(session *sql.DB) error {
-	_, err := session.Exec(createTableQuery)
-	if err != nil {
-		return fmt.Errorf("unable to create table an error occurred - %w", err)
-	}
-	return nil
 }
 
 func tryPingDB(db *sql.DB) func(context.Context) error {

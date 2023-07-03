@@ -27,7 +27,7 @@ func parseFlags() (Conf, error) {
 	flag.StringVar(&conf.runAddr, "a", ":8080", "address and port to run server")
 	flag.StringVar(&conf.logLevel, "l", "debug", "log level")
 	flag.StringVar(&conf.filePath, "f", "tmp/metrics-db.json", "path to store file")
-	flag.StringVar(&conf.dsn, "d", "", "database's dsn connection configs")
+	flag.StringVar(&conf.dsn, "d", "host=localhost user=app password=123qwe dbname=go_train sslmode=disable", "database's dsn connection configs")
 	flag.TextVar(&conf.hashKey, "k", &defaultKey, "the key to calculate hash")
 	flag.BoolVar(&conf.isRestore, "r", true, "load saved data")
 	flag.IntVar(&conf.storeInterval, "i", 5, "interval of storing data on disk")
