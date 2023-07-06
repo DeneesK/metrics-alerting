@@ -45,26 +45,38 @@ func run() error {
 	r := api.Routers(metricsStorage, log, []byte(conf.hashKey))
 	srv := http.Server{Addr: conf.runAddr, Handler: r}
 
-	wg.Add(1)
-	go runServer(&wg, &srv)
+	ctx, cancelContext := context.WithCancel(context.Background())
+
+	go runServer(&wg, &srv, ctx)
 	log.Infof("server started at %s", conf.runAddr)
 
 	<-termChan
-
-	err = srv.Shutdown(context.Background())
-	if err != nil {
-		return nil
-	}
-
+	cancelContext()
 	wg.Wait()
 
 	return nil
 }
 
-func runServer(wg *sync.WaitGroup, srv *http.Server) {
-	defer wg.Done()
-	err := srv.ListenAndServe()
-	if err != nil {
-		log.Fatal(err)
+func runServer(wg *sync.WaitGroup, srv *http.Server, ctx context.Context) {
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		err := srv.ListenAndServe()
+		if err != nil {
+			log.Printf("server return error - %v", err)
+		}
+	}()
+	for {
+		select {
+		case <-ctx.Done():
+			err := srv.Shutdown(ctx)
+			if err != nil {
+				log.Printf("during shutdown error ocurred - %v", err)
+			}
+		default:
+			continue
+		}
 	}
+
 }
