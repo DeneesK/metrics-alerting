@@ -62,13 +62,13 @@ func runServer(ctx context.Context, wg *sync.WaitGroup, srv *http.Server) {
 	wg.Add(1)
 	go func() {
 		err := srv.ListenAndServe()
-		if err != nil {
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Printf("server return error - %v", err)
 		}
 	}()
 	<-ctx.Done()
 	err := srv.Shutdown(ctx)
-	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+	if err != nil {
 		log.Printf("during shutdown error ocurred - %v", err)
 	}
 	wg.Done()
