@@ -27,8 +27,11 @@ type Store interface {
 	Close() error
 }
 
-func Routers(ms Store, logging *zap.SugaredLogger) chi.Router {
+func Routers(ms Store, logging *zap.SugaredLogger, key []byte) chi.Router {
 	r := chi.NewRouter()
+	if len(key) != 0 {
+		r.Use(hasher(logging, key))
+	}
 	r.Use(withLogging(logging))
 	r.Use(gzipMiddleware(logging))
 	r.Post("/update/", UpdateJSON(ms, logging))
@@ -50,7 +53,7 @@ func UpdatesJSON(storage Store, log *zap.SugaredLogger) http.HandlerFunc {
 			return
 		}
 		if err := storage.StoreBatch(metrics); err != nil {
-			log.Debugf("during attempt to store banch of data error ocurred: %v", err)
+			log.Debugf("during attempt to store batch of data error ocurred: %v", err)
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}

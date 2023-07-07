@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DeneesK/metrics-alerting/internal/api"
+	"github.com/DeneesK/metrics-alerting/internal/bodyhasher"
 	"github.com/DeneesK/metrics-alerting/internal/models"
 	"github.com/DeneesK/metrics-alerting/internal/services/metriccollector"
 	"github.com/hashicorp/go-retryablehttp"
@@ -29,15 +32,14 @@ const (
 )
 
 type Collector interface {
-	StartCollect()
+	StartCollect(context.Context)
 	GetRuntimeMetrics() metriccollector.RuntimeMetrics
 	GetRandomValue() float64
 	GetPollCount() int64
 	ResetPollCount()
 }
 
-func sendMetrics(ms Collector, runAddr string) error {
-	runtimeMetrics := ms.GetRuntimeMetrics()
+func sendMetrics(runtimeMetrics metriccollector.RuntimeMetrics, ms Collector, runAddr string, hashKey []byte) error {
 	cpuMetrics := runtimeMetrics.GetCPUMetrics()
 	memMetrics := runtimeMetrics.GetMemMetrics()
 	length := len(cpuMetrics) + len(memMetrics) + additionalMetricsLen
@@ -61,7 +63,7 @@ func sendMetrics(ms Collector, runAddr string) error {
 	metrics = append(metrics, models.Metrics{ID: randomValue, MType: gaugeMetric, Value: &randomV})
 	metrics = append(metrics, models.Metrics{ID: pollCount, MType: counterMetric, Delta: &pollC})
 
-	statusCode, err := sendBatch(retryClient, runAddr, metrics)
+	statusCode, err := sendBatch(retryClient, runAddr, metrics, hashKey)
 	if err != nil {
 		return fmt.Errorf("all attempts to establish the connection have been run out, during attempts to send data error ocurred - %w, ", err)
 	}
@@ -71,7 +73,7 @@ func sendMetrics(ms Collector, runAddr string) error {
 	return nil
 }
 
-func sendBatch(retryClient *retryablehttp.Client, runAddr string, metrics []models.Metrics) (int, error) {
+func sendBatch(retryClient *retryablehttp.Client, runAddr string, metrics []models.Metrics, hashKey []byte) (int, error) {
 	res, err := json.Marshal(&metrics)
 	if err != nil {
 		return 0, fmt.Errorf("serialization error - %w", err)
@@ -96,9 +98,16 @@ func sendBatch(retryClient *retryablehttp.Client, runAddr string, metrics []mode
 	if err != nil {
 		return 0, fmt.Errorf("request error - %w", err)
 	}
+
+	if len(hashKey) != 0 {
+		hsh, err := bodyhasher.CalculateHash(r, hashKey)
+		req.Header.Add(api.HashHeader, hsh)
+		if err != nil {
+			return 0, fmt.Errorf("hash calculation failed with error - %w", err)
+		}
+	}
 	req.Header.Add("Accept-Encoding", encodeType)
 	req.Header.Add("Content-Encoding", encodeType)
-	req.Header.Add("Content-Type", contentType)
 	req.Header.Add("Content-Type", contentType)
 	resp, err := retryClient.Do(req)
 	if err != nil {
@@ -126,7 +135,7 @@ func compress(b []byte) ([]byte, error) {
 }
 
 // provides a linear sequence in 2 sec steps (1,3,5)
-func linearBackoff(min, max time.Duration, attemptNum int, resp *http.Response) time.Duration {
+func linearBackoff(min, _ time.Duration, attemptNum int, _ *http.Response) time.Duration {
 	sleepTime := min + min*time.Duration(2*attemptNum)
 	return sleepTime
 }

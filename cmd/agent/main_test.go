@@ -45,7 +45,7 @@ func Test_postReport(t *testing.T) {
 				}
 				w.WriteHeader(http.StatusMethodNotAllowed)
 			}))
-			statusCode, err := sendBatch(retryClient, ts.URL, test.args.metrics)
+			statusCode, err := sendBatch(retryClient, ts.URL, test.args.metrics, nil)
 			assert.NoError(t, err)
 			assert.Equal(t, statusCode, test.wantCode)
 			ts.Close()

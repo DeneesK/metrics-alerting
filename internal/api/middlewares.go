@@ -1,14 +1,20 @@
 package api
 
 import (
+	"bytes"
 	"compress/gzip"
+	"fmt"
 	"io"
+
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/DeneesK/metrics-alerting/internal/bodyhasher"
 	"go.uber.org/zap"
 )
+
+const HashHeader = "HashSHA256"
 
 type responseData struct {
 	status int
@@ -18,6 +24,24 @@ type responseData struct {
 type loggingResponseWriter struct {
 	http.ResponseWriter
 	responseData *responseData
+}
+
+type hashBody struct {
+	http.ResponseWriter
+	hashKey []byte
+}
+
+func (r *hashBody) Write(b []byte) (int, error) {
+	hs, err := bodyhasher.CalculateHash(b, r.hashKey)
+	if err != nil {
+		return 0, fmt.Errorf("hash calculation failed - %w", err)
+	}
+	r.ResponseWriter.Header().Add(HashHeader, hs)
+	size, err := r.ResponseWriter.Write(b)
+	if err != nil {
+		return size, err
+	}
+	return size, nil
 }
 
 func (r *loggingResponseWriter) Write(b []byte) (int, error) {
@@ -127,6 +151,41 @@ func withLogging(log *zap.SugaredLogger) func(http.Handler) http.Handler {
 				"duration", duration,
 				"size", responseData.size,
 			)
+		})
+	}
+}
+
+func hasher(log *zap.SugaredLogger, key []byte) func(http.Handler) http.Handler {
+	return func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			bodyBytes, err := io.ReadAll(req.Body)
+			if err != nil {
+				log.Errorf("during reading body error ocurred - %w", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			req.Body.Close()
+			var ha string
+			if ha = req.Header.Get(HashHeader); ha == "" {
+				log.Errorf("empty header %s", HashHeader)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			hs, err := bodyhasher.CalculateHash(bodyBytes, key)
+			if err != nil {
+				log.Errorf("hash calculation failed - %w", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			if strings.Compare(hs, ha) != 0 {
+				log.Errorf("hashes must be equal - %w", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+			hb := hashBody{w, key}
+			h.ServeHTTP(&hb, req)
 		})
 	}
 }
